@@ -1,6 +1,7 @@
 #include <Windows.h>
 #include <Shlwapi.h>
 #include <TlHelp32.h>
+#include <Psapi.h>
 #include <cstdio>
 #include <cstring>
 #include <Scylla/Logger.h>
@@ -43,6 +44,80 @@ static void LogCallback(const wchar_t *msg)
     _putws(msg);
 }
 
+bool EnablePrivilege(LPCTSTR lpszPrivilegeName, BOOL bEnable)
+{
+    HANDLE hToken;
+    TOKEN_PRIVILEGES    tp;
+    LUID luid;
+    bool ret;
+
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY | TOKEN_READ, &hToken))
+        return FALSE;
+
+    if (!LookupPrivilegeValue(NULL, lpszPrivilegeName, &luid))
+        return FALSE;
+
+    tp.PrivilegeCount = 1;
+    tp.Privileges[0].Luid = luid;
+    tp.Privileges[0].Attributes = bEnable ? SE_PRIVILEGE_ENABLED : 0;
+
+    ret = AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(tp), NULL, NULL);
+    CloseHandle(hToken);
+
+    return ret;
+}
+
+TCHAR* GetNameFromHandle(HANDLE hFile)
+{
+    BOOL bSuccess = FALSE;
+    TCHAR pszFilename[MAX_PATH + 1];
+    HANDLE hFileMap;
+
+    DWORD dwFileSizeHi = 0;
+    DWORD dwFileSizeLo = GetFileSize(hFile, &dwFileSizeHi);
+
+    bool success = false;
+    if (dwFileSizeLo == 0 && dwFileSizeHi == 0)
+    {
+        return nullptr;
+    }
+
+    hFileMap = CreateFileMapping(hFile, NULL, PAGE_READONLY, 0, 1, NULL);
+
+    if (hFileMap)
+    {
+        void* pMem = MapViewOfFile(hFileMap, FILE_MAP_READ, 0, 0, 1);
+
+        if (pMem)
+        {
+            success = GetMappedFileName(GetCurrentProcess(), pMem, pszFilename, MAX_PATH); 
+            UnmapViewOfFile(pMem);
+        }
+
+        CloseHandle(hFileMap);
+    }
+
+    if (!success) {
+        return nullptr;
+    }
+
+    auto ans = new TCHAR[MAX_PATH + 1];
+    auto nn = pszFilename;
+    for (auto mm = nn; mm[0] != 0;mm++) {
+        if (mm[0] == '\\') {
+            nn = mm + 1;
+        }
+    }
+    lstrcpyW(ans, nn);
+    return ans;
+}
+
+static TCHAR* requireDll[] = {
+    L"ntdll.dll",
+    L"kernel32.dll",
+    L"user32.dll",
+};
+
 int wmain(int argc, wchar_t* argv[])
 {
     DWORD targetPid = 0;
@@ -66,17 +141,84 @@ int wmain(int argc, wchar_t* argv[])
 
     bool waitOnExit = true;
 
+    PROCESS_INFORMATION pi = { 0 };
+    STARTUPINFO si = { 0 };
+    DEBUG_EVENT de;
+    bool newProcess = false;
+    si.cb = sizeof(si);
+
     if (argc >= 3)
     {
         wchar_t* pid;
+        wchar_t* exe_path;
 
         if (ArgStartsWith(argv[1], L"pid:", pid))
         {
             auto radix = 10;
-            if(wcsstr(pid, L"0x") == pid)
+            if (wcsstr(pid, L"0x") == pid)
                 radix = 16, pid += 2;
-            if(!convertNumber(pid, targetPid, radix))
+            if (!convertNumber(pid, targetPid, radix))
                 targetPid = 0;
+        }
+        else if (ArgStartsWith(argv[1], L"new:", exe_path))
+        {
+            if (!EnablePrivilege(SE_DEBUG_NAME, TRUE)) {
+                fwprintf(stderr, L"adjust debug privilege failed; error code = 0x%08X\n", GetLastError());
+                return 1;
+            }
+            if (!CreateProcess(NULL, exe_path, NULL, NULL, FALSE, DEBUG_ONLY_THIS_PROCESS | DEBUG_PROCESS, NULL, NULL, &si, &pi)) {
+                fwprintf(stderr, L"CreateProcess(\"%s\") failed; error code = 0x%08X\n", exe_path, GetLastError());
+                return 1;
+            }
+
+            auto ndll = sizeof(requireDll) / sizeof(requireDll[0]);
+            auto dllv = new bool[ndll];
+            for (size_t i = 0; i < ndll; i++) dllv[i] = false;
+
+            while (true) {
+                if (!WaitForDebugEvent(&de, INFINITE)) {
+                    fwprintf(stderr, L"Debug process failed; error code = 0x%08X\n", GetLastError());
+                    delete dllv;
+                    return 1;
+                }
+
+                if (de.dwDebugEventCode == LOAD_DLL_DEBUG_EVENT) {
+                    auto filename = GetNameFromHandle(de.u.LoadDll.hFile);
+
+                    if (!filename) {
+                        fwprintf(stderr, L"can't get loaded library\n");
+                        delete dllv;
+                        return 1;
+                    }
+                    wprintf(L"%s: load %s\n", exe_path, filename);
+
+                    for (size_t i = 0; i < ndll; i++) {
+                        if (lstrcmp(requireDll[i], filename) == 0) {
+                            dllv[i] = true;
+                        }
+                    }
+                    delete filename;
+
+                    bool readygo = true;
+                    for (size_t i = 0; i < ndll; i++)
+                        readygo = readygo && dllv[i];
+
+                    if (readygo) {
+                        delete dllv;
+                        break;
+                    }
+                }
+                else if (de.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT) {
+                    fwprintf(stderr, L"NOEXPECTED: debuggee exit\n");
+                    delete dllv;
+                    return 1;
+                }
+
+                ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
+            }
+
+            targetPid = pi.dwProcessId;
+            newProcess = true;
         }
         else
             targetPid = GetProcessIdByName(argv[1]);
@@ -108,11 +250,22 @@ int wmain(int argc, wchar_t* argv[])
     }
     else
     {
-        wprintf(L"Usage: %s <process name> <dll path> [nowait]\n", argv[0]);
-        wprintf(L"Usage: %s pid:<process id> <dll path> [nowait]", argv[0]);
+        wprintf(L"Usage: %s <process name>   <dll path> [nowait]\n", argv[0]);
+        wprintf(L"Usage: %s pid:<process id> <dll path> [nowait]\n", argv[0]);
+        wprintf(L"Usage: %s new:<executable> <dll path>",            argv[0]);
     }
 
-    if (waitOnExit)
+    if (newProcess) {
+        if(!DebugActiveProcessStop(pi.dwProcessId)){
+            fwprintf(stderr, L"detach failed; error code = 0x%08X\n", GetLastError());
+            result = 1;
+        }
+        else {
+            wprintf(L"resume process\n");
+        }
+    }
+
+    if (waitOnExit && !newProcess)
         getchar();
 
     return 0;

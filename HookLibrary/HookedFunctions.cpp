@@ -1,4 +1,5 @@
 #include "HookMain.h"
+#include "LogClient.h"
 
 #pragma intrinsic(_ReturnAddress)
 
@@ -7,6 +8,7 @@ HOOK_DLL_DATA HookDllData = { 0 };
 #include "HookedFunctions.h"
 #include "HookHelper.h"
 #include "Tls.h"
+#include <stdio.h>
 
 void FakeCurrentParentProcessId(PSYSTEM_PROCESS_INFORMATION pInfo);
 void FakeCurrentOtherOperationCount(PSYSTEM_PROCESS_INFORMATION pInfo);
@@ -1143,3 +1145,15 @@ NTSTATUS NTAPI HookedNtResumeThread(HANDLE ThreadHandle, PULONG PreviousSuspendC
 		return HookDllData.dNtResumeThread(ThreadHandle, PreviousSuspendCount);
 	}
 }
+
+#include <Windows.h>
+
+NTSTATUS NTAPI HookedNtWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG BufferSize, PULONG NumberofBytesWritten)
+{
+    // TCHAR hello[4096];
+    // wsprintfW(hello, L"Hello %d", HookDllData.udpIPCPort);
+    // MessageBox(nullptr, hello, L"NOPE", 0);
+    logClient()->send("nope", 4);
+    return HookDllData.dNtWriteVirtualMemory(ProcessHandle, BaseAddress, Buffer, BufferSize, NumberofBytesWritten);
+}
+

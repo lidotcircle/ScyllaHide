@@ -9,10 +9,12 @@
 #include <Scylla/Settings.h>
 #include <Scylla/Util.h>
 
+#include "LogServer.h"
 #include "DynamicMapping.h"
 #include "..\HookLibrary\HookMain.h"
 #include "ApplyHooking.h"
 #include "../PluginGeneric/Injector.h"
+
 
 scl::Settings g_settings;
 scl::Logger g_log;
@@ -122,6 +124,10 @@ int wmain(int argc, wchar_t* argv[])
 {
     DWORD targetPid = 0;
     WCHAR * dllPath = 0;
+    LogServer srv(0);
+    srv.init();
+    udpPort = srv.GetPort();
+    udpAddr = srv.GetAddr();
 
     auto wstrPath = scl::GetModuleFileNameW();
     wstrPath.resize(wstrPath.find_last_of(L'\\') + 1);
@@ -263,6 +269,10 @@ int wmain(int argc, wchar_t* argv[])
         else {
             wprintf(L"resume process\n");
         }
+    }
+
+    if (newProcess) {
+        srv.poll();
     }
 
     if (waitOnExit && !newProcess)

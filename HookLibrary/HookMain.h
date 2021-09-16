@@ -116,6 +116,11 @@ typedef struct _HOOK_DLL_DATA {
     t_NtCreateThread dNtCreateThread;
     DWORD NtCreateThreadBackupSize;
 
+    DWORD udpIPCAddr;
+    DWORD udpIPCPort;
+    DWORD NtWriteVirtualMemoryBackupSize;
+    t_NtWriteVirtualMemory dNtWriteVirtualMemory;
+
 	/////////////////////////////////////////////////////////
 	t_GetTickCount dGetTickCount;
 	DWORD GetTickCountBackupSize;
@@ -173,4 +178,6 @@ typedef struct _HOOK_DLL_DATA {
 #define HOOK_ERROR_RESOLVE_IMPORT 1
 #define HOOK_ERROR_DLLMAIN 2
 #define HOOK_ERROR_PEHEADER 3
+
+extern HOOK_DLL_DATA HookDllData;
 

@@ -35,12 +35,7 @@ void LogClient::send(const char* buf, __int32 bufsize) {
     addr_in.sin_addr.s_addr = this->m_addr;
     addr_in.sin_port = this->m_port;
 
-    TCHAR hello[100] = { 0 };
-    wsprintfW(hello, L"%d:%d", this->m_addr, this->m_port);
-    MessageBox(nullptr, hello, L"sendto", 0);
-
     if (sendto(this->m_socket, buf, bufsize, 0, (struct sockaddr*)&addr_in, sizeof(addr_in)) != bufsize) {
-        MessageBox(nullptr, L"SEND MSG FAILED", L"Bad", 0);
         closesocket(this->m_socket);
         this->m_socket = 0;
     }
@@ -63,11 +58,9 @@ LogClient* logClient() {
 
     _logClient = new ((LogClient*)&_bytes) LogClient();
     _logClient->init(HookDllData.udpIPCPort, HookDllData.udpIPCAddr);
-    MessageBox(nullptr, L"HELLO", L"NOPE", 0);
 
-    char hello[] = "hello you";
+    char hello[] = "hello server";
     _logClient->send(hello, sizeof(hello));
-    MessageBox(nullptr, L"HELLO2", L"NOPE", 0);
 
     return _logClient;
 }

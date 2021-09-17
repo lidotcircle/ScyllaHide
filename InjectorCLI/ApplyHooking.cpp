@@ -75,6 +75,8 @@ t_NtQuerySystemTime _NtQuerySystemTime = 0;
 t_NtQueryPerformanceCounter _NtQueryPerformanceCounter = 0;
 t_NtResumeThread _NtResumeThread = 0;
 t_NtWriteVirtualMemory _NtWriteVirtualMemory = 0;
+t_NtReadVirtualMemory _NtReadVirtualMemory = 0;
+t_NtOpenProcess _NtOpenProcess = 0;
 
 bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, HANDLE hProcess, BYTE * dllMemory, DWORD_PTR imageBase)
 {
@@ -105,6 +107,8 @@ bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, HANDLE hProcess, BYTE * dllMemory, DWOR
     void * HookedNtQueryPerformanceCounter = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtQueryPerformanceCounter") + imageBase);
     void * HookedNtResumeThread = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtResumeThread") + imageBase);
     void * HookedNtWriteVirtualMemory = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtWriteVirtualMemory") + imageBase);
+    void * HookedNtReadVirtualMemory  = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtReadVirtualMemory") + imageBase);
+    void * HookedNtOpenProcess = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtOpenProcess") + imageBase);
 
     HookedNativeCallInternal = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNativeCallInternal") + imageBase);
 
@@ -127,6 +131,8 @@ bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, HANDLE hProcess, BYTE * dllMemory, DWOR
     _NtQueryPerformanceCounter = (t_NtQueryPerformanceCounter)GetProcAddress(hNtdll, "NtQueryPerformanceCounter");
     _NtResumeThread = (t_NtResumeThread)GetProcAddress(hNtdll, "NtResumeThread");
     _NtWriteVirtualMemory = (t_NtWriteVirtualMemory)GetProcAddress(hNtdll, "NtWriteVirtualMemory");
+    _NtReadVirtualMemory = (t_NtReadVirtualMemory)GetProcAddress(hNtdll, "NtWriteVirtualMemory");
+    _NtOpenProcess = (t_NtOpenProcess)GetProcAddress(hNtdll, "NtWriteVirtualMemory");
 
     g_log.LogDebug(L"ApplyNtdllHook -> _NtSetInformationThread %p _NtQuerySystemInformation %p _NtQueryInformationProcess %p _NtSetInformationProcess %p _NtQueryObject %p",
         _NtSetInformationThread,
@@ -331,8 +337,15 @@ bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, HANDLE hProcess, BYTE * dllMemory, DWOR
     {
         hdd->udpIPCAddr = udpAddr;
         hdd->udpIPCPort = udpPort;
+
         g_log.LogDebug(L"ApplyNtdllHook -> Hooking NtWriteVirtualMemory");
         HOOK_NATIVE(NtWriteVirtualMemory);
+
+        g_log.LogDebug(L"ApplyNtdllHook -> Hooking NtReadVirtualMemory");
+        HOOK_NATIVE(NtReadVirtualMemory);
+
+        g_log.LogDebug(L"ApplyNtdllHook -> Hooking NtOpenProcess");
+        HOOK_NATIVE(NtOpenProcess);
     }
 
     hdd->isNtdllHooked = TRUE;

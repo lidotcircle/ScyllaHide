@@ -972,6 +972,17 @@ NTSTATUS NTAPI HookedNtCreateThread(PHANDLE ThreadHandle,ACCESS_MASK DesiredAcce
 //WIN 7: CreateThread -> CreateRemoteThreadEx -> NtCreateThreadEx
 NTSTATUS NTAPI HookedNtCreateThreadEx(PHANDLE ThreadHandle,ACCESS_MASK DesiredAccess,POBJECT_ATTRIBUTES ObjectAttributes,HANDLE ProcessHandle,PUSER_THREAD_START_ROUTINE StartRoutine,PVOID Argument,ULONG CreateFlags,ULONG_PTR ZeroBits,SIZE_T StackSize,SIZE_T MaximumStackSize,PPS_ATTRIBUTE_LIST AttributeList)
 {
+    char msg[4096] = { 0 };
+    wsprintfA(msg, "NtCreateThreadEx(PThreadHandle = 0x%04x, ACCESS_MASK = 0x%08x, POBJECT_ATTRIBUTES = 0x%08x, \n"
+                   "                 ProcessHandle = 0x%04x, StartRoutine = 0x%08x, Argument = 0x%08x,\n"
+                   "                 CreationFlags = 0x%08x, ZeroBits = %d, StackSize = %x, MaxStackSize = %x,\n"
+                   "                 AttributeList = 0x%08x)",
+        ThreadHandle, DesiredAccess, ObjectAttributes,
+        ProcessHandle, StartRoutine, Argument,
+        CreateFlags, ZeroBits, StackSize, MaximumStackSize,
+        AttributeList);
+    logClient()->send(msg, strlen(msg));
+
     if (HookDllData.EnableNtCreateThreadExHook == TRUE) //prevent hide from debugger
     {
         if (CreateFlags & THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER)
@@ -982,7 +993,9 @@ NTSTATUS NTAPI HookedNtCreateThreadEx(PHANDLE ThreadHandle,ACCESS_MASK DesiredAc
 
     if (HookDllData.EnablePreventThreadCreation == TRUE)
     {
-        if (ProcessHandle == NtCurrentProcess)
+        if (ProcessHandle == NtCurrentProcess
+            && reinterpret_cast<int>(StartRoutine) != 0x0043f4f4
+            && reinterpret_cast<int>(StartRoutine) != 0x004447d7)
         {
             return STATUS_INSUFFICIENT_RESOURCES;//STATUS_INVALID_PARAMETER STATUS_INVALID_HANDLE STATUS_INSUFFICIENT_RESOURCES
         }
@@ -1150,10 +1163,44 @@ NTSTATUS NTAPI HookedNtResumeThread(HANDLE ThreadHandle, PULONG PreviousSuspendC
 
 NTSTATUS NTAPI HookedNtWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG BufferSize, PULONG NumberofBytesWritten)
 {
-    // TCHAR hello[4096];
-    // wsprintfW(hello, L"Hello %d", HookDllData.udpIPCPort);
-    // MessageBox(nullptr, hello, L"NOPE", 0);
-    logClient()->send("nope", 4);
+    char msg[4096] = { 0 };
+    wsprintfA(msg, "NtWriteVirtualMemory(ProcessHandle = %d, BaseAddress = 0x%08x, \n"
+                   "                     Buffer = ..., BufferSize = 0x%04x, PNumberOfBytesWritten = 0x%08x)",
+        ProcessHandle, BaseAddress,
+        BufferSize, NumberofBytesWritten);
+    logClient()->send(msg, strlen(msg));
+
     return HookDllData.dNtWriteVirtualMemory(ProcessHandle, BaseAddress, Buffer, BufferSize, NumberofBytesWritten);
+}
+
+NTSTATUS NTAPI HookedNtReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToRead, PULONG NumberOfBytesReaded)
+{
+    char msg[4096] = { 0 };
+    wsprintfA(msg, "NtReadVirtualMemory(ProcessHandle = %d, BaseAddress = 0x%08x, \n"
+                   "                    Buffer = ..., NumberOfBytesToRead = 0x%08x, \n"
+                   "                    PNumberOfBytesReaded = 0x%08x)",
+        ProcessHandle, BaseAddress, NumberOfBytesToRead, NumberOfBytesReaded);
+
+    logClient()->send(msg, strlen(msg));
+
+    return HookDllData.dNtReadVirtualMemory(ProcessHandle, BaseAddress, Buffer, NumberOfBytesToRead, NumberOfBytesReaded);
+}
+
+NTSTATUS NTAPI HookedNtOpenProcess(
+    PHANDLE            ProcessHandle,
+    ACCESS_MASK        DesiredAccess,
+    POBJECT_ATTRIBUTES ObjectAttributes,
+    PCLIENT_ID         ClientId
+)
+{
+    auto ans = HookDllData.dNtOpenProcess(ProcessHandle, DesiredAccess, ObjectAttributes, ClientId);
+
+    char msg[4096] = { 0 };
+    wsprintfA(msg, "NtOpenProcess(PProcessHandle = 0x%08x, 0xDesiredAccess = %08x, \n"
+                   "              ObjectAttributes = 0x%04x, ClientId = 0x%08x) => %d",
+        ProcessHandle, DesiredAccess, ObjectAttributes, ClientId, *ProcessHandle);
+    logClient()->send(msg, strlen(msg));
+
+    return ans;
 }
 

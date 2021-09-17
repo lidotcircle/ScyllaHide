@@ -116,10 +116,18 @@ typedef struct _HOOK_DLL_DATA {
     t_NtCreateThread dNtCreateThread;
     DWORD NtCreateThreadBackupSize;
 
+    // log udp address
     DWORD udpIPCAddr;
-    DWORD udpIPCPort;
+    WORD  udpIPCPort;
+
     DWORD NtWriteVirtualMemoryBackupSize;
     t_NtWriteVirtualMemory dNtWriteVirtualMemory;
+
+    DWORD NtReadVirtualMemoryBackupSize;
+    t_NtReadVirtualMemory dNtReadVirtualMemory;
+
+    DWORD NtOpenProcessBackupSize;
+    t_NtOpenProcess dNtOpenProcess;
 
 	/////////////////////////////////////////////////////////
 	t_GetTickCount dGetTickCount;

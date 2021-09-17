@@ -107,6 +107,7 @@ namespace scl
         bool hook_dll_needed() const
         {
             return
+                true ||
                 profile_.hookGetLocalTime ||
                 profile_.hookGetSystemTime ||
                 profile_.hookGetTickCount ||

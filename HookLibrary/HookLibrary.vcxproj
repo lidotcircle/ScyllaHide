@@ -166,6 +166,7 @@
     <ClCompile Include="HookedFunctions.cpp" />
     <ClCompile Include="HookHelper.cpp" />
     <ClCompile Include="DllMain.cpp" />
+    <ClCompile Include="LogClient.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Export.def" />
@@ -174,6 +175,7 @@
     <ClInclude Include="HookedFunctions.h" />
     <ClInclude Include="HookHelper.h" />
     <ClInclude Include="HookMain.h" />
+    <ClInclude Include="LogClient.h" />
     <ClInclude Include="Tls.h" />
   </ItemGroup>
   <ItemGroup>

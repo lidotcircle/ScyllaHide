@@ -22,7 +22,7 @@ void LogClient::init(__int16 port, __int32 addr) {
     this->m_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
     if (this->m_socket <= 0) {
-        MessageBox(nullptr, L"create udp socket failed, bye", L"Bad", 0);
+        MessageBoxA(nullptr, "create udp socket failed, bye", "Bad", 0);
     }
 }
 

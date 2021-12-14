@@ -2,6 +2,7 @@
 #include "LogClient.h"
 
 #pragma intrinsic(_ReturnAddress)
+#pragma comment(lib, "msvcrt.lib")
 
 HOOK_DLL_DATA HookDllData = { 0 };
 

@@ -25,21 +25,21 @@ HOOK_DLL_DATA g_hdd;
 
 void ChangeBadWindowText();
 void ReadSettings();
-DWORD GetProcessIdByName(const WCHAR * processName);
-bool startInjection(DWORD targetPid, const WCHAR * dllPath);
+DWORD GetProcessIdByName(const char * processName);
+bool startInjection(DWORD targetPid, const char * dllPath);
 bool SetDebugPrivileges();
-BYTE * ReadFileToMemory(const WCHAR * targetFilePath);
+BYTE * ReadFileToMemory(const char * targetFilePath);
 bool startInjectionProcess(HANDLE hProcess, BYTE * dllMemory);
 bool StartHooking(HANDLE hProcess, BYTE * dllMemory, DWORD_PTR imageBase);
 bool convertNumber(const wchar_t* str, unsigned long & result, int radix);
 
 // Check if argument starts with text (case insensitive).
-bool ArgStartsWith(wchar_t* arg, const wchar_t* with);
+bool ArgStartsWith(const char* arg, const char* with);
 
 // Check if argument starts with text (case insensitive) and return param after the text.
-bool ArgStartsWith(wchar_t* arg, const wchar_t* text, wchar_t* &param);
+bool ArgStartsWith(const char* arg, const char* text, const char* &param);
 
-#define PREFIX_PATH L"C:\\Users\\Admin\\Documents\\Visual Studio 2010\\Projects\\ScyllaHide"
+#define PREFIX_PATH "C:\\Users\\Admin\\Documents\\Visual Studio 2010\\Projects\\ScyllaHide"
 
 static void LogCallback(const wchar_t *msg)
 {
@@ -69,10 +69,10 @@ bool EnablePrivilege(LPCTSTR lpszPrivilegeName, BOOL bEnable)
     return ret;
 }
 
-TCHAR* GetNameFromHandle(HANDLE hFile)
+char* GetNameFromHandle(HANDLE hFile)
 {
     BOOL bSuccess = FALSE;
-    TCHAR pszFilename[MAX_PATH + 1];
+    char pszFilename[MAX_PATH + 1];
     HANDLE hFileMap;
 
     DWORD dwFileSizeHi = 0;
@@ -103,34 +103,28 @@ TCHAR* GetNameFromHandle(HANDLE hFile)
         return nullptr;
     }
 
-    auto ans = new TCHAR[MAX_PATH + 1];
-    auto nn = pszFilename;
-    for (auto mm = nn; mm[0] != 0;mm++) {
-        if (mm[0] == '\\') {
-            nn = mm + 1;
-        }
-    }
-    lstrcpyW(ans, nn);
+    auto ans = new char[MAX_PATH + 1];
+    strcpy(ans, pszFilename);
     return ans;
 }
 
-static TCHAR* requireDll[] = {
-    L"ntdll.dll",
-    L"kernel32.dll",
-    L"user32.dll",
+static char* requireDll[] = {
+    "ntdll.dll",
+    "kernel32.dll",
+    "user32.dll",
 };
 
-int wmain(int argc, wchar_t* argv[])
+int main(int argc, char* argv[])
 {
     DWORD targetPid = 0;
-    WCHAR * dllPath = 0;
+    char * dllPath = 0;
     LogServer srv(0);
     srv.init();
     udpPort = srv.GetPort();
     udpAddr = srv.GetAddr();
 
     auto wstrPath = scl::GetModuleFileNameW();
-    wstrPath.resize(wstrPath.find_last_of(L'\\') + 1);
+    wstrPath.resize(wstrPath.find_last_of('\\') + 1);
 
     g_scyllaHideIniPath = wstrPath + scl::Settings::kFileName;
 
@@ -155,25 +149,25 @@ int wmain(int argc, wchar_t* argv[])
 
     if (argc >= 3)
     {
-        wchar_t* pid;
-        wchar_t* exe_path;
+        char* pid;
+        char* exe_path;
 
-        if (ArgStartsWith(argv[1], L"pid:", pid))
+        if (ArgStartsWith(argv[1], "pid:", pid))
         {
             auto radix = 10;
-            if (wcsstr(pid, L"0x") == pid)
+            if (csstr(pid, "0x") == pid)
                 radix = 16, pid += 2;
             if (!convertNumber(pid, targetPid, radix))
                 targetPid = 0;
         }
-        else if (ArgStartsWith(argv[1], L"new:", exe_path))
+        else if (ArgStartsWith(argv[1], "new:", exe_path))
         {
             if (!EnablePrivilege(SE_DEBUG_NAME, TRUE)) {
-                fwprintf(stderr, L"adjust debug privilege failed; error code = 0x%08X\n", GetLastError());
+                fprintf(stderr, "adjust debug privilege failed; error code = 0x%08X\n", GetLastError());
                 return 1;
             }
             if (!CreateProcess(NULL, exe_path, NULL, NULL, FALSE, DEBUG_ONLY_THIS_PROCESS | DEBUG_PROCESS, NULL, NULL, &si, &pi)) {
-                fwprintf(stderr, L"CreateProcess(\"%s\") failed; error code = 0x%08X\n", exe_path, GetLastError());
+                fprintf(stderr, "CreateProcess(\"%s\") failed; error code = 0x%08X\n", exe_path, GetLastError());
                 return 1;
             }
 
@@ -183,7 +177,7 @@ int wmain(int argc, wchar_t* argv[])
 
             while (true) {
                 if (!WaitForDebugEvent(&de, INFINITE)) {
-                    fwprintf(stderr, L"Debug process failed; error code = 0x%08X\n", GetLastError());
+                    fprintf(stderr, "Debug process failed; error code = 0x%08X\n", GetLastError());
                     delete dllv;
                     return 1;
                 }
@@ -192,14 +186,14 @@ int wmain(int argc, wchar_t* argv[])
                     auto filename = GetNameFromHandle(de.u.LoadDll.hFile);
 
                     if (!filename) {
-                        fwprintf(stderr, L"can't get loaded library\n");
+                        fprintf(stderr, "can't get loaded library\n");
                         delete dllv;
                         return 1;
                     }
-                    wprintf(L"%s: load %s\n", exe_path, filename);
+                    printf("%s: load %s\n", exe_path, filename);
 
                     for (size_t i = 0; i < ndll; i++) {
-                        if (lstrcmp(requireDll[i], filename) == 0) {
+                        if (strcmp(requireDll[i], filename) == 0) {
                             dllv[i] = true;
                         }
                     }
@@ -215,7 +209,7 @@ int wmain(int argc, wchar_t* argv[])
                     }
                 }
                 else if (de.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT) {
-                    fwprintf(stderr, L"NOEXPECTED: debuggee exit\n");
+                    fprintf(stderr, "NOEXPECTED: debuggee exit\n");
                     delete dllv;
                     return 1;
                 }
@@ -232,17 +226,17 @@ int wmain(int argc, wchar_t* argv[])
         dllPath = argv[2];
 
         if (argc >= 4)
-            waitOnExit = !(ArgStartsWith(argv[3], L"nowait"));
+            waitOnExit = !(ArgStartsWith(argv[3], "nowait"));
     }
     else
     {
 
 #ifdef _WIN64
-        targetPid = GetProcessIdByName(L"scylla_x64.exe");//scylla_x64
-        dllPath = PREFIX_PATH L"\\Release\\HookLibraryx64.dll";
+        targetPid = GetProcessIdByName("scylla_x64.exe");//scylla_x64
+        dllPath = PREFIX_PATH "\\Release\\HookLibraryx64.dll";
 #else
-        targetPid = GetProcessIdByName(L"ThemidaTest.exe");//GetProcessIdByName(L"ThemidaTest.exe");//GetProcessIdByName(L"VMProtect.vmp.exe");//GetProcessIdByName(L"scylla_x86.exe");
-        dllPath = PREFIX_PATH L"\\Release\\HookLibraryx86.dll";
+        targetPid = GetProcessIdByName("ThemidaTest.exe");//GetProcessIdByName("ThemidaTest.exe");//GetProcessIdByName("VMProtect.vmp.exe");//GetProcessIdByName("scylla_x86.exe");
+        dllPath = PREFIX_PATH "\\Release\\HookLibraryx86.dll";
 #endif
     }
 
@@ -250,24 +244,24 @@ int wmain(int argc, wchar_t* argv[])
 
     if (targetPid && dllPath)
     {
-        wprintf(L"\nPID\t: %d 0x%X\nDLL Path: %s\n\n", targetPid, targetPid, dllPath);
+        printf("\nPID\t: %d 0x%X\nDLL Path: %s\n\n", targetPid, targetPid, dllPath);
         if (!startInjection(targetPid, dllPath))
             result = 1; // failure
     }
     else
     {
-        wprintf(L"Usage: %s <process name>   <dll path> [nowait]\n", argv[0]);
-        wprintf(L"Usage: %s pid:<process id> <dll path> [nowait]\n", argv[0]);
-        wprintf(L"Usage: %s new:<executable> <dll path>",            argv[0]);
+        printf("Usage: %s <process name>   <dll path> [nowait]\n", argv[0]);
+        printf("Usage: %s pid:<process id> <dll path> [nowait]\n", argv[0]);
+        printf("Usage: %s new:<executable> <dll path>",            argv[0]);
     }
 
     if (newProcess) {
         if(!DebugActiveProcessStop(pi.dwProcessId)){
-            fwprintf(stderr, L"detach failed; error code = 0x%08X\n", GetLastError());
+            fprintf(stderr, "detach failed; error code = 0x%08X\n", GetLastError());
             result = 1;
         }
         else {
-            wprintf(L"resume process\n");
+            printf("resume process\n");
         }
     }
 
@@ -333,12 +327,12 @@ bool startInjectionProcess(HANDLE hProcess, BYTE * dllMemory)
             {
                 if (WriteProcessMemory(hProcess, (LPVOID)((DWORD_PTR)hookDllDataAddressRva + (DWORD_PTR)remoteImageBase), &g_hdd, sizeof(HOOK_DLL_DATA), 0))
                 {
-                    wprintf(L"Hook injection successful, image base %p\n", remoteImageBase);
+                    printf("Hook injection successful, image base %p\n", remoteImageBase);
                     success = true;
                 }
                 else
                 {
-                    wprintf(L"Failed to write hook dll data\n");
+                    printf("Failed to write hook dll data\n");
                 }
             }
         }
@@ -346,7 +340,7 @@ bool startInjectionProcess(HANDLE hProcess, BYTE * dllMemory)
     else
     {
         if (StartHooking(hProcess, nullptr, 0))
-            wprintf(L"PEB patch successful, hook injection not needed\n");
+            printf("PEB patch successful, hook injection not needed\n");
         success = true;
     }
 
@@ -355,7 +349,7 @@ bool startInjectionProcess(HANDLE hProcess, BYTE * dllMemory)
     return success;
 }
 
-bool startInjection(DWORD targetPid, const WCHAR * dllPath)
+bool startInjection(DWORD targetPid, const char * dllPath)
 {
     bool result = false;
 
@@ -371,20 +365,20 @@ bool startInjection(DWORD targetPid, const WCHAR * dllPath)
             {
                 if (!ApplyAntiAntiAttach(targetPid))
                 {
-                    wprintf(L"Anti-Anti-Attach failed\n");
+                    printf("Anti-Anti-Attach failed\n");
                 }
             }
             free(dllMemory);
         }
         else
         {
-            wprintf(L"Cannot read file to memory %s\n", dllPath);
+            printf("Cannot read file to memory %s\n", dllPath);
         }
         CloseHandle(hProcess);
     }
     else
     {
-        wprintf(L"Cannot open process handle %d\n", targetPid);
+        printf("Cannot open process handle %d\n", targetPid);
     }
 
     return result;
@@ -412,7 +406,7 @@ bool SetDebugPrivileges()
     return retVal;
 }
 
-DWORD GetProcessIdByName(const WCHAR * processName)
+DWORD GetProcessIdByName(const CHAR * processName)
 {
     HANDLE hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 
@@ -426,7 +420,7 @@ DWORD GetProcessIdByName(const WCHAR * processName)
 
     if (!Process32First(hProcessSnap, &pe32))
     {
-        wprintf(L"Error getting first process\n");
+        printf("Error getting first process\n");
         CloseHandle(hProcessSnap);
         return 0;
     }
@@ -435,7 +429,7 @@ DWORD GetProcessIdByName(const WCHAR * processName)
 
     do
     {
-        if (!_wcsicmp(pe32.szExeFile, processName))
+        if (!strcmp(pe32.szExeFile, processName))
         {
             pid = pe32.th32ProcessID;
             break;
@@ -481,11 +475,11 @@ void ReadSettings()
     g_hdd.EnableProtectProcessId = g_settings.opts().protectProcessId;
 }
 
-bool convertNumber(const wchar_t* str, unsigned long & result, int radix)
+bool convertNumber(const char* str, unsigned long & result, int radix)
 {
     errno = 0;
-    wchar_t* end;
-    result = wcstoul(str, &end, radix);
+    char* end;
+    result = strtol(str, &end, radix);
     if(!result && end == str)
         return false;
     if(result == ULLONG_MAX && errno)
@@ -495,16 +489,16 @@ bool convertNumber(const wchar_t* str, unsigned long & result, int radix)
     return true;
 }
 
-bool ArgStartsWith(wchar_t* arg, const wchar_t* with)
+bool ArgStartsWith(const char* arg, const char* with)
 {
-    return _wcsnicmp(arg, with, wcslen(with)) == 0;
+    return StrCmpNA(arg, with, strlen(with)) == 0;
 }
 
-bool ArgStartsWith(wchar_t* arg, const wchar_t* text, wchar_t* &param)
+bool ArgStartsWith(const char* arg, const char* text, const char* &param)
 {
-    auto len = wcslen(text);
+    auto len = strlen(text);
 
-    if (_wcsnicmp(arg, text, len) == 0 && arg[len])
+    if (StrCmpNA(arg, text, len) == 0 && arg[len])
     {
         param = arg + len;
         return true;

@@ -8,6 +8,8 @@
 #include <Scylla/PebHider.h>
 #include <Scylla/Settings.h>
 #include <Scylla/Util.h>
+#include <string>
+using namespace std;
 
 #include "LogServer.h"
 #include "DynamicMapping.h"
@@ -31,19 +33,19 @@ bool SetDebugPrivileges();
 BYTE * ReadFileToMemory(const char * targetFilePath);
 bool startInjectionProcess(HANDLE hProcess, BYTE * dllMemory);
 bool StartHooking(HANDLE hProcess, BYTE * dllMemory, DWORD_PTR imageBase);
-bool convertNumber(const wchar_t* str, unsigned long & result, int radix);
+bool convertNumber(const char* str, unsigned long & result, int radix);
 
 // Check if argument starts with text (case insensitive).
-bool ArgStartsWith(const char* arg, const char* with);
+bool ArgStartsWith(char* arg, const char* with);
 
 // Check if argument starts with text (case insensitive) and return param after the text.
-bool ArgStartsWith(const char* arg, const char* text, const char* &param);
+bool ArgStartsWith(char* arg, const char* text, char* &param);
 
 #define PREFIX_PATH "C:\\Users\\Admin\\Documents\\Visual Studio 2010\\Projects\\ScyllaHide"
 
-static void LogCallback(const wchar_t *msg)
+static void LogCallback(const char *msg)
 {
-    _putws(msg);
+    puts(msg);
 }
 
 bool EnablePrivilege(LPCTSTR lpszPrivilegeName, BOOL bEnable)
@@ -155,7 +157,7 @@ int main(int argc, char* argv[])
         if (ArgStartsWith(argv[1], "pid:", pid))
         {
             auto radix = 10;
-            if (csstr(pid, "0x") == pid)
+            if (ArgStartsWith(pid, "0x"))
                 radix = 16, pid += 2;
             if (!convertNumber(pid, targetPid, radix))
                 targetPid = 0;
@@ -489,16 +491,18 @@ bool convertNumber(const char* str, unsigned long & result, int radix)
     return true;
 }
 
-bool ArgStartsWith(const char* arg, const char* with)
+bool ArgStartsWith(char* arg, const char* with)
 {
-    return StrCmpNA(arg, with, strlen(with)) == 0;
+    string s2(with);
+    string s1(arg, s2.length());
+    return s1 == s2;
 }
 
-bool ArgStartsWith(const char* arg, const char* text, const char* &param)
+bool ArgStartsWith(char* arg, const char* text, char* &param)
 {
     auto len = strlen(text);
 
-    if (StrCmpNA(arg, text, len) == 0 && arg[len])
+    if (ArgStartsWith(arg, text) && arg[len])
     {
         param = arg + len;
         return true;

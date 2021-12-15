@@ -627,6 +627,36 @@ BYTE * ReadFileToMemory(const WCHAR * targetFilePath)
     return FilePtr;
 }
 
+BYTE * ReadFileToMemory(const char * targetFilePath)
+{
+    HANDLE hFile;
+    DWORD dwBytesRead;
+    DWORD FileSize;
+    BYTE* FilePtr = 0;
+
+    hFile = CreateFileA(targetFilePath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, 0);
+    if (hFile != INVALID_HANDLE_VALUE)
+    {
+        FileSize = GetFileSize(hFile, NULL);
+        if (FileSize > 0)
+        {
+            FilePtr = (BYTE*)calloc(FileSize + 1, 1);
+            if (FilePtr)
+            {
+                if (!ReadFile(hFile, (LPVOID)FilePtr, FileSize, &dwBytesRead, NULL))
+                {
+                    free(FilePtr);
+                    FilePtr = 0;
+                }
+
+            }
+        }
+        CloseHandle(hFile);
+    }
+
+    return FilePtr;
+}
+
 void FillHookDllData(HANDLE hProcess, HOOK_DLL_DATA *hdd)
 {
     hdd->EnablePebBeingDebugged = g_settings.opts().fixPebBeingDebugged;

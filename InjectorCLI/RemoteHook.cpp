@@ -7,8 +7,6 @@
 #include "ApplyHooking.h"
 #include <stdio.h>
 
-#pragma comment(lib, "distorm.lib")
-
 // GDT selector numbers on AMD64
 #define KGDT64_R3_CMCODE (2 * 16)   // user mode 32-bit code
 #define KGDT64_R3_CODE (3 * 16)     // user mode 64-bit code

@@ -11,12 +11,13 @@
 #include <string>
 #include <set>
 #include <iostream>
+#include <cxxopts.hpp>
 using namespace std;
 
 #include "LogServer.h"
 #include "DynamicMapping.h"
-#include "..\HookLibrary\HookMain.h"
 #include "ApplyHooking.h"
+#include "../HookLibrary/HookMain.h"
 #include "../PluginGeneric/Injector.h"
 
 

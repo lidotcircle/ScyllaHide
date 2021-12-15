@@ -9,6 +9,8 @@
 #include <Scylla/Settings.h>
 #include <Scylla/Util.h>
 #include <string>
+#include <set>
+#include <iostream>
 using namespace std;
 
 #include "LogServer.h"
@@ -71,7 +73,7 @@ bool EnablePrivilege(LPCTSTR lpszPrivilegeName, BOOL bEnable)
     return ret;
 }
 
-char* GetNameFromHandle(HANDLE hFile)
+string GetNameFromHandle(HANDLE hFile)
 {
     BOOL bSuccess = FALSE;
     char pszFilename[MAX_PATH + 1];
@@ -105,12 +107,10 @@ char* GetNameFromHandle(HANDLE hFile)
         return nullptr;
     }
 
-    auto ans = new char[MAX_PATH + 1];
-    strcpy(ans, pszFilename);
-    return ans;
+    return string(pszFilename);
 }
 
-static char* requireDll[] = {
+static set<string> requireDll = {
     "ntdll.dll",
     "kernel32.dll",
     "user32.dll",
@@ -173,46 +173,31 @@ int main(int argc, char* argv[])
                 return 1;
             }
 
-            auto ndll = sizeof(requireDll) / sizeof(requireDll[0]);
-            auto dllv = new bool[ndll];
-            for (size_t i = 0; i < ndll; i++) dllv[i] = false;
-
+            auto required = requireDll;
             while (true) {
                 if (!WaitForDebugEvent(&de, INFINITE)) {
                     fprintf(stderr, "Debug process failed; error code = 0x%08X\n", GetLastError());
-                    delete dllv;
                     return 1;
                 }
 
                 if (de.dwDebugEventCode == LOAD_DLL_DEBUG_EVENT) {
                     auto filename = GetNameFromHandle(de.u.LoadDll.hFile);
+                    if (filename.find_last_of('\\') != string::npos)
+                        filename = filename.substr(filename.find_last_of('\\') + 1);
 
-                    if (!filename) {
+                    if (filename.empty()) {
                         fprintf(stderr, "can't get loaded library\n");
-                        delete dllv;
                         return 1;
                     }
-                    printf("%s: load %s\n", exe_path, filename);
+                    printf("%s: load %s\n", exe_path, filename.c_str());
+                    if (required.find(filename) != required.end())
+                        required.erase(required.find(filename));
 
-                    for (size_t i = 0; i < ndll; i++) {
-                        if (strcmp(requireDll[i], filename) == 0) {
-                            dllv[i] = true;
-                        }
-                    }
-                    delete filename;
-
-                    bool readygo = true;
-                    for (size_t i = 0; i < ndll; i++)
-                        readygo = readygo && dllv[i];
-
-                    if (readygo) {
-                        delete dllv;
+                    if (required.empty())
                         break;
-                    }
                 }
                 else if (de.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT) {
                     fprintf(stderr, "NOEXPECTED: debuggee exit\n");
-                    delete dllv;
                     return 1;
                 }
 

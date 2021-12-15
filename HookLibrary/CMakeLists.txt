@@ -10,7 +10,11 @@ LIST(APPEND HookLibrary_SOURCES ${InstrumentationCallbackSource})
 SET_SOURCE_FILES_PROPERTIES(${InstrumentationCallbackSource} PROPERTIES LANGUAGE ASM_MASM)
 
 add_library(HookLibrary SHARED ${HookLibrary_SOURCES})
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set_target_properties(HookLibrary PROPERTIES OUTPUT_NAME HookLibraryx64)
+elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    set_target_properties(HookLibrary PROPERTIES OUTPUT_NAME HookLibraryx86)
+endif()
 target_include_directories(HookLibrary PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 
 target_link_libraries(HookLibrary scylla)
-

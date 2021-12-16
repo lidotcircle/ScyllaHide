@@ -7,6 +7,7 @@
 #include "RemoteHook.h"
 
 #include <iostream>
+using namespace std;
 
 uint16_t udpPort = 0;
 uint32_t udpAddr = 0;
@@ -80,7 +81,7 @@ t_NtOpenProcess _NtOpenProcess = 0;
 
 bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, Process_t process, BYTE * dllMemory, DWORD_PTR imageBase)
 {
-    hNtdll = GetModuleHandleW(L"ntdll.dll");
+    hNtdll = GetModuleHandle("ntdll.dll");
 
 #ifndef _WIN64
     countNativeHooks = 0;
@@ -133,13 +134,14 @@ bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, Process_t process, BYTE * dllMemory, DW
     _NtWriteVirtualMemory = (t_NtWriteVirtualMemory)GetProcAddress(hNtdll, "NtWriteVirtualMemory");
     _NtReadVirtualMemory = (t_NtReadVirtualMemory)GetProcAddress(hNtdll, "NtWriteVirtualMemory");
     _NtOpenProcess = (t_NtOpenProcess)GetProcAddress(hNtdll, "NtWriteVirtualMemory");
-
+    
     g_log.LogDebug(L"ApplyNtdllHook -> _NtSetInformationThread %p _NtQuerySystemInformation %p _NtQueryInformationProcess %p _NtSetInformationProcess %p _NtQueryObject %p",
         _NtSetInformationThread,
         _NtQuerySystemInformation,
         _NtQueryInformationProcess,
         _NtSetInformationProcess,
         _NtQueryObject);
+
     g_log.LogDebug(L"ApplyNtdllHook -> _NtYieldExecution %p _NtGetContextThread %p _NtSetContextThread %p _KiUserExceptionDispatcher %p _NtContinue %p",
         _NtYieldExecution,
         _NtGetContextThread,
@@ -156,7 +158,7 @@ bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, Process_t process, BYTE * dllMemory, DW
         _NtQueryPerformanceCounter,
         _NtResumeThread);
 
-    if (hdd->EnableNtSetInformationThreadHook == TRUE)
+    if (true)
     {
         g_log.LogDebug(L"ApplyNtdllHook -> Hooking NtSetInformationThread");
         HOOK_NATIVE(NtSetInformationThread);

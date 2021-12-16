@@ -2,6 +2,11 @@
 #include "..\HookLibrary\HookMain.h"
 #include "..\InjectorCLI\DynamicMapping.h"
 
+#include "process/win_process_native.h"
+#include <memory>
+using Process_t = std::shared_ptr<WinProcessNative>;
+
+
 #define IMAGE32(NtHeaders) ((NtHeaders)->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC)
 #define IMAGE64(NtHeaders) ((NtHeaders)->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC)
 
@@ -30,13 +35,13 @@ typedef struct _PROCESS_SUSPEND_INFO
 void ReadNtApiInformation(HOOK_DLL_DATA *hdd);
 
 void InstallAntiAttachHook();
-void startInjectionProcess(HANDLE hProcess, HOOK_DLL_DATA *hdd, BYTE * dllMemory, bool newProcess);
+void startInjectionProcess(Process_t process, HOOK_DLL_DATA *hdd, BYTE * dllMemory, bool newProcess);
 void startInjection(DWORD targetPid, HOOK_DLL_DATA *hdd, const WCHAR * dllPath, bool newProcess);
 void injectDll(DWORD targetPid, const WCHAR * dllPath);
 BYTE * ReadFileToMemory(const WCHAR * targetFilePath);
 void FillHookDllData(HANDLE hProcess, HOOK_DLL_DATA * data);
 bool StartFixBeingDebugged(DWORD targetPid, bool setToNull);
-bool ApplyAntiAntiAttach(DWORD targetPid);
+bool ApplyAntiAntiAttach(Process_t process);
 
 DWORD GetAddressOfEntryPoint(BYTE * dllMemory);
 bool RemoveDebugPrivileges(HANDLE hProcess);

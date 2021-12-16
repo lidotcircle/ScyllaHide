@@ -6,6 +6,9 @@ ENABLE_LANGUAGE(ASM_MASM)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
+set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE    "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
 
 add_subdirectory("3rdparty")
 
@@ -27,3 +30,4 @@ target_link_libraries(PluginGeneric PUBLIC scylla)
 
 add_subdirectory("HookLibrary")
 add_subdirectory("InjectorCLI")
+add_subdirectory("ScyllaTest")

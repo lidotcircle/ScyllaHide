@@ -11,6 +11,7 @@
 #include <Scylla/Peb.h>
 #include "ApplyHooking.h"
 #include <stdio.h>
+#include <iostream>
 using namespace std;
 
 
@@ -440,7 +441,7 @@ void * DetourCreateRemoteWow64(Process_t process, bool createTramp)
 
     if (funcSize != 0 && createTramp)
     {
-        trampoline = (PBYTE)process->malloc(sizeof(changedBytes), PAGE_EXECUTE_READWRITE);
+        trampoline = (PBYTE)process->malloc(sizeof(changedBytes), 1, PAGE_EXECUTE_READWRITE);
         if (trampoline == nullptr)
             return nullptr;
 

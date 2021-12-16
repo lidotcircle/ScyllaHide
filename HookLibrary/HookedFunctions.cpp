@@ -1,5 +1,6 @@
 #include "HookMain.h"
 #include "LogClient.h"
+#include <stdio.h>
 
 #pragma intrinsic(_ReturnAddress)
 
@@ -1001,16 +1002,15 @@ NTSTATUS NTAPI HookedNtCreateThread(PHANDLE ThreadHandle,ACCESS_MASK DesiredAcce
 NTSTATUS NTAPI HookedNtCreateThreadEx(PHANDLE ThreadHandle,ACCESS_MASK DesiredAccess,POBJECT_ATTRIBUTES ObjectAttributes,HANDLE ProcessHandle,PUSER_THREAD_START_ROUTINE StartRoutine,PVOID Argument,ULONG CreateFlags,ULONG_PTR ZeroBits,SIZE_T StackSize,SIZE_T MaximumStackSize,PPS_ATTRIBUTE_LIST AttributeList)
 {
 #pragma comment(linker, "/EXPORT:" __FUNCTION__ "=" __FUNCDNAME__)
-    char msg[4096] = { 0 };
-    wsprintfA(msg, "NtCreateThreadEx(PThreadHandle = 0x%04x, ACCESS_MASK = 0x%08x, POBJECT_ATTRIBUTES = 0x%08x, \n"
-                   "                 ProcessHandle = 0x%04x, StartRoutine = 0x%08x, Argument = 0x%08x,\n"
-                   "                 CreationFlags = 0x%08x, ZeroBits = %d, StackSize = %x, MaxStackSize = %x,\n"
-                   "                 AttributeList = 0x%08x)",
+    auto client = logClient();
+    client->sendfmt("NtCreateThreadEx(PThreadHandle = 0x%04x, ACCESS_MASK = 0x%08x, POBJECT_ATTRIBUTES = 0x%08x, \n"
+                    "                 ProcessHandle = 0x%04x, StartRoutine = 0x%08x, Argument = 0x%08x,\n"
+                    "                 CreationFlags = 0x%08x, ZeroBits = %d, StackSize = %x, MaxStackSize = %x,\n"
+                    "                 AttributeList = 0x%08x)",
         ThreadHandle, DesiredAccess, ObjectAttributes,
         ProcessHandle, StartRoutine, Argument,
         CreateFlags, ZeroBits, StackSize, MaximumStackSize,
         AttributeList);
-    logClient()->send(msg, strlen(msg));
 
     if (HookDllData.EnableNtCreateThreadExHook == TRUE) //prevent hide from debugger
     {
@@ -1194,12 +1194,11 @@ NTSTATUS NTAPI HookedNtResumeThread(HANDLE ThreadHandle, PULONG PreviousSuspendC
 NTSTATUS NTAPI HookedNtWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG BufferSize, PULONG NumberofBytesWritten)
 {
 #pragma comment(linker, "/EXPORT:" __FUNCTION__ "=" __FUNCDNAME__)
-    char msg[4096] = { 0 };
-    wsprintfA(msg, "NtWriteVirtualMemory(ProcessHandle = %d, BaseAddress = 0x%08x, \n"
-                   "                     Buffer = ..., BufferSize = 0x%04x, PNumberOfBytesWritten = 0x%08x)",
+    auto client = logClient();
+    client->sendfmt("NtWriteVirtualMemory(ProcessHandle = %d, BaseAddress = 0x%08x, \n"
+                    "                     Buffer = ..., BufferSize = 0x%04x, PNumberOfBytesWritten = 0x%08x)",
         ProcessHandle, BaseAddress,
         BufferSize, NumberofBytesWritten);
-    logClient()->send(msg, strlen(msg));
 
     return HookDllData.dNtWriteVirtualMemory(ProcessHandle, BaseAddress, Buffer, BufferSize, NumberofBytesWritten);
 }
@@ -1207,13 +1206,11 @@ NTSTATUS NTAPI HookedNtWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddres
 NTSTATUS NTAPI HookedNtReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToRead, PULONG NumberOfBytesReaded)
 {
 #pragma comment(linker, "/EXPORT:" __FUNCTION__ "=" __FUNCDNAME__)
-    char msg[4096] = { 0 };
-    wsprintfA(msg, "NtReadVirtualMemory(ProcessHandle = %d, BaseAddress = 0x%08x, \n"
-                   "                    Buffer = ..., NumberOfBytesToRead = 0x%08x, \n"
-                   "                    PNumberOfBytesReaded = 0x%08x)",
+    auto client = logClient();
+    client->sendfmt("NtReadVirtualMemory(ProcessHandle = %d, BaseAddress = 0x%08x, \n"
+                    "                    Buffer = ..., NumberOfBytesToRead = 0x%08x, \n"
+                    "                    PNumberOfBytesReaded = 0x%08x)",
         ProcessHandle, BaseAddress, NumberOfBytesToRead, NumberOfBytesReaded);
-
-    logClient()->send(msg, strlen(msg));
 
     return HookDllData.dNtReadVirtualMemory(ProcessHandle, BaseAddress, Buffer, NumberOfBytesToRead, NumberOfBytesReaded);
 }
@@ -1228,11 +1225,10 @@ NTSTATUS NTAPI HookedNtOpenProcess(
 #pragma comment(linker, "/EXPORT:" __FUNCTION__ "=" __FUNCDNAME__)
     auto ans = HookDllData.dNtOpenProcess(ProcessHandle, DesiredAccess, ObjectAttributes, ClientId);
 
-    char msg[4096] = { 0 };
-    wsprintfA(msg, "NtOpenProcess(PProcessHandle = 0x%08x, 0xDesiredAccess = %08x, \n"
-                   "              ObjectAttributes = 0x%04x, ClientId = 0x%08x) => %d",
+    auto client = logClient();
+    client->sendfmt("NtOpenProcess(PProcessHandle = 0x%08x, 0xDesiredAccess = %08x, \n"
+                    "              ObjectAttributes = 0x%04x, ClientId = 0x%08x) => %d",
         ProcessHandle, DesiredAccess, ObjectAttributes, ClientId, *ProcessHandle);
-    logClient()->send(msg, strlen(msg));
 
     return ans;
 }

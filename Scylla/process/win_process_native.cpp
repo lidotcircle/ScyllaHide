@@ -28,7 +28,7 @@ static size_t round_to_2pow(size_t size) {
 class AllocatedPage {
 private:
     shared_ptr<MemoryMapWinPage> page;
-    size_t max_size;
+    size_t max_size; // TODO
     map<char*,size_t> allocations;
 
 public:
@@ -136,18 +136,21 @@ WinProcessNative::WinProcessNative(int pid): process_id(pid) {
     this->refresh_process();
 }
 
+void WinProcessNative::reopen(DWORD add_desiredAcess) {
+    HANDLE ph = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION | add_desiredAcess,
+                            FALSE, this->process_id);
+
+    if (ph == NULL)
+        throw runtime_error("OpenProcess failed");
+
+    this->process_handle = std::shared_ptr<HANDLE>(new HANDLE(ph), [](HANDLE *ph)
+                                                    { CloseHandle(*ph); delete ph; });
+}
+
 void WinProcessNative::refresh_process()
 {
-    if (!this->process_handle) {
-        HANDLE ph = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION,
-                                FALSE, this->process_id);
-
-        if (ph == NULL)
-            throw runtime_error("OpenProcess failed");
-
-        this->process_handle = std::shared_ptr<HANDLE>(new HANDLE(ph), [](HANDLE *ph)
-                                                       { CloseHandle(*ph); delete ph; });
-    }
+    if (!this->process_handle)
+        this->reopen(0);
     auto ph = *this->process_handle;
     this->process_maps.clear();
     this->modules.clear();
@@ -325,7 +328,7 @@ void* WinProcessNative::malloc(size_t size, size_t alignment, DWORD protect) {
     
     shared_ptr<MemoryMapWinPage> page;
     auto ptr = this->allocated_pages[protect]->malloc(size, alignment, page);
-    if (ptr) {
+    if (page) {
         this->process_maps.push_back(page);
         std::sort(this->process_maps.begin(), this->process_maps.end(), [](const shared_ptr<MemoryMap> &a, const shared_ptr<MemoryMap> &b) {
             return a->baseaddr() < b->baseaddr();

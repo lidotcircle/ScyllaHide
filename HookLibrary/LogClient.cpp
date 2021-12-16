@@ -1,6 +1,7 @@
 #include <Winsock2.h>
 #include <new.h>
 #include <assert.h>
+#include <stdio.h>
 #include "HookMain.h"
 #include "LogClient.h"
 
@@ -12,6 +13,17 @@ static decltype(closesocket)* fclosesocket = nullptr;
 static decltype(WSAStartup)*  fWSAStartup  = nullptr;
 static decltype(WSACleanup)*  fWSACleanup  = nullptr;
 
+static decltype(MessageBoxA)* fMessageBoxA = nullptr;
+static int (*fvsprintf_s)(const char* buf, const size_t, const char* fmt, va_list arg)  = nullptr;
+static int MessageBoxN(HWND wnd, LPCSTR text, LPCSTR caption, UINT type)
+{
+    if (!fMessageBoxA)
+        fMessageBoxA = (decltype(MessageBoxA)*)GetProcAddress(LoadLibraryA("user32.dll"), "MessageBoxA");
+
+    if (fMessageBoxA)
+        return fMessageBoxA(wnd, text, caption, type);
+    return 0;
+}
 
 LogClient::LogClient(__int16 port, __int32 addr) {
     if (fsocket == nullptr) {
@@ -35,7 +47,7 @@ LogClient::LogClient(__int16 port, __int32 addr) {
     this->m_socket = fsocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
     if (this->m_socket <= 0) {
-        MessageBoxA(nullptr, "create udp socket failed, bye", "Bad", 0);
+        MessageBoxN(nullptr, "create udp socket failed, bye", "Bad", 0);
     }
 }
 
@@ -52,6 +64,21 @@ void LogClient::send(const char* buf, __int32 bufsize) {
         fclosesocket(this->m_socket);
         this->m_socket = 0;
     }
+}
+
+void LogClient::sendfmt(const char* fmt, ...) {
+    if (fvsprintf_s == nullptr)
+        fvsprintf_s = (decltype(fvsprintf_s))GetProcAddress(LoadLibraryA("kernel32.dll"), "vsprintf_s");
+    
+    if (fvsprintf_s == nullptr)
+        return;
+
+    char buf[4096];
+    va_list args;
+    va_start(args, fmt);
+    size_t n = fvsprintf_s(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    this->send(buf, n);
 }
 
 LogClient::~LogClient() noexcept {

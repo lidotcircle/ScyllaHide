@@ -13,6 +13,7 @@ public:
     LogClient& operator=(const LogClient&) = delete;
 
     void send(const char* buf, __int32 bufsize);
+    void sendfmt(const char* fmt, ...);
 
     ~LogClient();
 };

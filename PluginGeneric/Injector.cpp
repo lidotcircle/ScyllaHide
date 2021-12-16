@@ -261,7 +261,7 @@ bool SafeResumeProcess(PPROCESS_SUSPEND_INFO suspendInfo)
     return success;
 }
 
-bool StartHooking(HANDLE hProcess, HOOK_DLL_DATA *hdd, BYTE * dllMemory, DWORD_PTR imageBase)
+bool StartHooking(Process_t process, HOOK_DLL_DATA *hdd, BYTE * dllMemory, DWORD_PTR imageBase)
 {
     hdd->dwProtectedProcessId = GetCurrentProcessId();
     hdd->EnableProtectProcessId = TRUE;
@@ -278,20 +278,20 @@ bool StartHooking(HANDLE hProcess, HOOK_DLL_DATA *hdd, BYTE * dllMemory, DWORD_P
     if (g_settings.opts().fixPebOsBuildNumber)
         peb_flags |= PEB_PATCH_OsBuildNumber;
 
-    ApplyPEBPatch(hProcess, peb_flags);
+    ApplyPEBPatch(process->rawhandle(), peb_flags);
     if (g_settings.opts().fixPebOsBuildNumber)
-        ApplyNtdllVersionPatch(hProcess);
+        ApplyNtdllVersionPatch(process->rawhandle());
 
     if (dllMemory == nullptr || imageBase == 0)
         return peb_flags != 0; // Not injecting hook DLL
 
-    return ApplyHook(hdd, hProcess, dllMemory, imageBase);
+    return ApplyHook(hdd, process, dllMemory, imageBase);
 }
 
-void startInjectionProcess(HANDLE hProcess, HOOK_DLL_DATA *hdd, BYTE * dllMemory, bool newProcess)
+void startInjectionProcess(Process_t process, HOOK_DLL_DATA *hdd, BYTE * dllMemory, bool newProcess)
 {
     PROCESS_SUSPEND_INFO suspendInfo;
-    if (!SafeSuspendProcess(hProcess, &suspendInfo))
+    if (!SafeSuspendProcess(process->rawhandle(), &suspendInfo))
         return;
 
     const bool injectDll = g_settings.hook_dll_needed() || hdd->isNtdllHooked || hdd->isKernel32Hooked || hdd->isUserDllHooked;
@@ -301,33 +301,33 @@ void startInjectionProcess(HANDLE hProcess, HOOK_DLL_DATA *hdd, BYTE * dllMemory
     if (!newProcess)
     {
         //g_log.Log(L"Apply hooks again");
-        if (injectDll && StartHooking(hProcess, hdd, dllMemory, (DWORD_PTR)remoteImageBase))
+        if (injectDll && StartHooking(process, hdd, dllMemory, (DWORD_PTR)remoteImageBase))
         {
-            WriteProcessMemory(hProcess, (LPVOID)((DWORD_PTR)hookDllDataAddressRva + (DWORD_PTR)remoteImageBase), hdd, sizeof(HOOK_DLL_DATA), 0);
+            process->write((LPVOID)((DWORD_PTR)hookDllDataAddressRva + (DWORD_PTR)remoteImageBase), hdd, sizeof(HOOK_DLL_DATA));
         }
         else if (!injectDll)
         {
-            StartHooking(hProcess, hdd, nullptr, 0);
+            StartHooking(process, hdd, nullptr, 0);
         }
     }
     else
     {
         if (g_settings.opts().removeDebugPrivileges)
         {
-            RemoveDebugPrivileges(hProcess);
+            RemoveDebugPrivileges(process->rawhandle());
         }
 
-        RestoreHooks(hdd, hProcess);
+        RestoreHooks(hdd, process);
 
         if (injectDll)
         {
-            remoteImageBase = MapModuleToProcess(hProcess, dllMemory, true);
+            remoteImageBase = MapModuleToProcess(process->rawhandle(), dllMemory, true);
             if (remoteImageBase)
             {
-                FillHookDllData(hProcess, hdd);
+                FillHookDllData(process->rawhandle(), hdd);
 
-                if (StartHooking(hProcess, hdd, dllMemory, (DWORD_PTR)remoteImageBase) &&
-                    WriteProcessMemory(hProcess, (LPVOID)((DWORD_PTR)hookDllDataAddressRva + (DWORD_PTR)remoteImageBase), hdd, sizeof(HOOK_DLL_DATA), 0))
+                if (StartHooking(process, hdd, dllMemory, (DWORD_PTR)remoteImageBase) &&
+                    process->write((LPVOID)((DWORD_PTR)hookDllDataAddressRva + (DWORD_PTR)remoteImageBase), hdd, sizeof(HOOK_DLL_DATA)))
                 {
                     g_log.LogInfo(L"Hook injection successful, image base %p", remoteImageBase);
                 }
@@ -343,7 +343,7 @@ void startInjectionProcess(HANDLE hProcess, HOOK_DLL_DATA *hdd, BYTE * dllMemory
         }
         else
         {
-            if (StartHooking(hProcess, hdd, nullptr, 0))
+            if (StartHooking(process, hdd, nullptr, 0))
                 g_log.LogInfo(L"PEB patch successful, hook injection not needed\n");
         }
     }
@@ -351,28 +351,19 @@ void startInjectionProcess(HANDLE hProcess, HOOK_DLL_DATA *hdd, BYTE * dllMemory
     SafeResumeProcess(&suspendInfo);
 }
 
-void startInjection(DWORD targetPid, HOOK_DLL_DATA *hdd, const WCHAR * dllPath, bool newProcess)
+void startInjection(Process_t process, HOOK_DLL_DATA *hdd, const WCHAR * dllPath, bool newProcess)
 {
-    HANDLE hProcess = OpenProcess( PROCESS_SUSPEND_RESUME | PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_QUERY_INFORMATION | PROCESS_SET_INFORMATION,
-        0, targetPid);
-    if (hProcess)
+    process->reopen(PROCESS_SUSPEND_RESUME | PROCESS_SET_INFORMATION);
+    BYTE * dllMemory = ReadFileToMemory(dllPath);
+    if (dllMemory)
     {
-        BYTE * dllMemory = ReadFileToMemory(dllPath);
-        if (dllMemory)
-        {
-            startInjectionProcess(hProcess, hdd, dllMemory, newProcess);
-            free(dllMemory);
-        }
-        else
-        {
-            g_log.LogError(L"Cannot find %s", dllPath);
-            MessageBoxW(nullptr, L"Failed to load ScyllaHide hook library DLL! Make sure it is installed correctly and has not been deleted by an anti-virus.", L"Error", MB_ICONERROR);
-        }
-        CloseHandle(hProcess);
+        startInjectionProcess(process, hdd, dllMemory, newProcess);
+        free(dllMemory);
     }
     else
     {
-        g_log.LogError(L"Cannot open process handle %d", targetPid);
+        g_log.LogError(L"Cannot find %s", dllPath);
+        MessageBoxW(nullptr, L"Failed to load ScyllaHide hook library DLL! Make sure it is installed correctly and has not been deleted by an anti-virus.", L"Error", MB_ICONERROR);
     }
 }
 
@@ -747,15 +738,10 @@ PATCH_FUNC patchFunctions[] = {
     }
 };
 
-bool ApplyAntiAntiAttach(DWORD targetPid)
+bool ApplyAntiAntiAttach(Process_t process)
 {
-    bool result = false;
-    HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_QUERY_INFORMATION, 0, targetPid);
-
-    if (!hProcess)
-        return result;
-
     HMODULE hMod = GetModuleHandleW(L"ntdll.dll");
+    bool result = true;
 
     for (ULONG i = 0; i < _countof(patchFunctions); i++)
     {
@@ -764,21 +750,9 @@ bool ApplyAntiAntiAttach(DWORD targetPid)
 
     for (ULONG i = 0; i < _countof(patchFunctions); i++)
     {
-        ULONG oldProtection;
-        if (VirtualProtectEx(hProcess, patchFunctions[i].funcAddr, patchFunctions[i].funcSize, PAGE_EXECUTE_READWRITE, &oldProtection) &&
-            WriteProcessMemory(hProcess, patchFunctions[i].funcAddr, patchFunctions[i].funcAddr, patchFunctions[i].funcSize, nullptr))
-        {
-            VirtualProtectEx(hProcess, patchFunctions[i].funcAddr, patchFunctions[i].funcSize, oldProtection, &oldProtection);
-            result = true;
-        }
-        else
-        {
+        if (!process->write(patchFunctions[i].funcAddr, patchFunctions[i].funcAddr, patchFunctions[i].funcSize))
             result = false;
-            break;
-        }
     }
-
-    CloseHandle(hProcess);
 
     return result;
 }

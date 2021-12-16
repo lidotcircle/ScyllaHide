@@ -50,6 +50,7 @@ public:
     inline bool read (void* addr, void* data, size_t size) {return this->read (reinterpret_cast<MemoryMap::addr_t>(addr), data, size);}
 
     HANDLE rawhandle();
+    void reopen(DWORD add_desiredAcess);
 
     void refresh();
 };

@@ -31,11 +31,11 @@ HOOK_DLL_DATA g_hdd;
 void ChangeBadWindowText();
 void ReadSettings();
 DWORD GetProcessIdByName(const char * processName);
-bool startInjection(DWORD targetPid, const char * dllPath);
+bool startInjection(Process_t process, const char * dllPath);
 bool SetDebugPrivileges();
 BYTE * ReadFileToMemory(const char * targetFilePath);
-bool startInjectionProcess(HANDLE hProcess, BYTE * dllMemory);
-bool StartHooking(HANDLE hProcess, BYTE * dllMemory, DWORD_PTR imageBase);
+bool startInjectionProcess(Process_t process, BYTE * dllMemory);
+bool StartHooking(Process_t process, BYTE * dllMemory, DWORD_PTR imageBase);
 bool convertNumber(const char* str, unsigned long & result, int radix);
 
 // Check if argument starts with text (case insensitive).
@@ -114,7 +114,6 @@ string GetNameFromHandle(HANDLE hFile)
 static set<string> requireDll = {
     "ntdll.dll",
     "kernel32.dll",
-    "user32.dll",
 };
 
 int main(int argc, char* argv[])
@@ -229,11 +228,12 @@ int main(int argc, char* argv[])
     }
 
     int result = 0;
+    auto process = make_shared<WinProcessNative>(targetPid);
 
     if (targetPid && dllPath)
     {
         printf("\nPID\t: %d 0x%X\nDLL Path: %s\n\n", targetPid, targetPid, dllPath);
-        if (!startInjection(targetPid, dllPath))
+        if (!startInjection(process, dllPath))
             result = 1; // failure
     }
     else
@@ -263,7 +263,7 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-static bool StartHooking(HANDLE hProcess, BYTE * dllMemory, DWORD_PTR imageBase)
+static bool StartHooking(Process_t process, BYTE * dllMemory, DWORD_PTR imageBase)
 {
     g_hdd.dwProtectedProcessId = 0;
     g_hdd.EnableProtectProcessId = FALSE;
@@ -280,40 +280,40 @@ static bool StartHooking(HANDLE hProcess, BYTE * dllMemory, DWORD_PTR imageBase)
     if (g_settings.opts().fixPebOsBuildNumber)
         peb_flags |= PEB_PATCH_OsBuildNumber;
 
-    ApplyPEBPatch(hProcess, peb_flags);
+    ApplyPEBPatch(process->rawhandle(), peb_flags);
     if (g_settings.opts().fixPebOsBuildNumber)
-        ApplyNtdllVersionPatch(hProcess);
+        ApplyNtdllVersionPatch(process->rawhandle());
 
     if (dllMemory == nullptr || imageBase == 0)
         return peb_flags != 0; // Not injecting hook DLL
 
-    return ApplyHook(&g_hdd, hProcess, dllMemory, imageBase);
+    return ApplyHook(&g_hdd, process, dllMemory, imageBase);
 }
 
-bool startInjectionProcess(HANDLE hProcess, BYTE * dllMemory)
+bool startInjectionProcess(Process_t process, BYTE * dllMemory)
 {
     PROCESS_SUSPEND_INFO suspendInfo;
-    if (!SafeSuspendProcess(hProcess, &suspendInfo))
+    if (!SafeSuspendProcess(process->rawhandle(), &suspendInfo))
         return false;
 
     if (g_settings.opts().removeDebugPrivileges)
     {
-        RemoveDebugPrivileges(hProcess);
+        RemoveDebugPrivileges(process->rawhandle());
     }
 
     const bool injectDll = g_settings.hook_dll_needed();
     bool success = false;
     if (injectDll)
     {
-        LPVOID remoteImageBase = MapModuleToProcess(hProcess, dllMemory, true);
+        LPVOID remoteImageBase = MapModuleToProcess(process->rawhandle(), dllMemory, true);
         if (remoteImageBase != nullptr)
         {
-            FillHookDllData(hProcess, &g_hdd);
+            FillHookDllData(process->rawhandle(), &g_hdd);
             DWORD hookDllDataAddressRva = GetDllFunctionAddressRVA(dllMemory, "HookDllData");
 
-            if (StartHooking(hProcess, dllMemory, (DWORD_PTR)remoteImageBase))
+            if (StartHooking(process, dllMemory, (DWORD_PTR)remoteImageBase))
             {
-                if (WriteProcessMemory(hProcess, (LPVOID)((DWORD_PTR)hookDllDataAddressRva + (DWORD_PTR)remoteImageBase), &g_hdd, sizeof(HOOK_DLL_DATA), 0))
+                if (process->write((LPVOID)((DWORD_PTR)hookDllDataAddressRva + (DWORD_PTR)remoteImageBase), &g_hdd, sizeof(HOOK_DLL_DATA)))
                 {
                     printf("Hook injection successful, image base %p\n", remoteImageBase);
                     success = true;
@@ -327,7 +327,7 @@ bool startInjectionProcess(HANDLE hProcess, BYTE * dllMemory)
     }
     else
     {
-        if (StartHooking(hProcess, nullptr, 0))
+        if (StartHooking(process, nullptr, 0))
             printf("PEB patch successful, hook injection not needed\n");
         success = true;
     }
@@ -337,36 +337,31 @@ bool startInjectionProcess(HANDLE hProcess, BYTE * dllMemory)
     return success;
 }
 
-bool startInjection(DWORD targetPid, const char * dllPath)
+bool startInjection(Process_t process, const char * dllPath)
 {
     bool result = false;
 
-    HANDLE hProcess = OpenProcess( PROCESS_SUSPEND_RESUME | PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_QUERY_INFORMATION | PROCESS_SET_INFORMATION,
-        0, targetPid);
-    if (hProcess)
+    process->reopen(PROCESS_SUSPEND_RESUME | PROCESS_CREATE_THREAD | PROCESS_SET_INFORMATION);
+    BYTE * dllMemory = ReadFileToMemory(dllPath);
+    if (dllMemory)
     {
-        BYTE * dllMemory = ReadFileToMemory(dllPath);
-        if (dllMemory)
+        try {
+            result = startInjectionProcess(process, dllMemory);
+        } catch (const std::exception& e) {
+            cout << "startInjection exception: " << e.what() << endl;
+        }
+        if (g_settings.opts().killAntiAttach)
         {
-            result = startInjectionProcess(hProcess, dllMemory);
-            if (g_settings.opts().killAntiAttach)
+            if (!ApplyAntiAntiAttach(process))
             {
-                if (!ApplyAntiAntiAttach(targetPid))
-                {
-                    printf("Anti-Anti-Attach failed\n");
-                }
+                printf("Anti-Anti-Attach failed\n");
             }
-            free(dllMemory);
         }
-        else
-        {
-            printf("Cannot read file to memory %s\n", dllPath);
-        }
-        CloseHandle(hProcess);
+        free(dllMemory);
     }
     else
     {
-        printf("Cannot open process handle %d\n", targetPid);
+        printf("Cannot read file to memory %s\n", dllPath);
     }
 
     return result;

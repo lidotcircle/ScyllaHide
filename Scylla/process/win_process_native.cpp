@@ -13,6 +13,124 @@
 #include <assert.h>
 using namespace std;
 
+static char* align_ptr(char* ptr, size_t align) {
+    return (char*)(((size_t)ptr + align - 1) & ~(align - 1));
+}
+
+static size_t round_to_2pow(size_t size) {
+    size_t ret = 1;
+    while (ret < size) {
+        ret <<= 1;
+    }
+    return ret;
+}
+
+class AllocatedPage {
+private:
+    shared_ptr<MemoryMapWinPage> page;
+    size_t max_size;
+    map<char*,size_t> allocations;
+
+public:
+    AllocatedPage(shared_ptr<MemoryMapWinPage> page): page(page) {
+        max_size = page->size();
+    }
+    void* malloc(size_t size, size_t align) {
+        auto ptr = static_cast<char*>(reinterpret_cast<void*>(page->baseaddr()));
+        if (reinterpret_cast<uintptr_t>(ptr) % align != 0)
+            return nullptr;
+
+        auto ptr_end = ptr + page->size();
+        for (;ptr < ptr_end; ptr = align_ptr(ptr, align)) {
+            auto lb = allocations.lower_bound(ptr);
+            if (lb != allocations.end() && lb->first + lb->second > ptr) {
+                ptr = lb->first + lb->second;
+                continue;
+            }
+
+            size_t holesize = ptr_end - ptr;
+            auto ub = allocations.upper_bound(ptr);
+            if (ub != allocations.end())
+                holesize = ub->first - ptr;
+
+            if (holesize < size) {
+                ptr += holesize;
+                continue;
+            }
+
+            allocations[ptr] = size;
+            return ptr;
+        }
+
+        return nullptr;
+    }
+    bool free(void* _ptr) {
+        auto ptr = static_cast<char*>(_ptr);
+
+        if (allocations.find(ptr) == allocations.end())
+            return false;
+
+        allocations.erase(ptr);
+        return true;
+    }
+    void free_all() {
+        this->allocations.clear();
+        this->max_size = page->size();
+    }
+    size_t maxsize() {
+        return this->max_size;
+    }
+};
+
+class PagePool {
+private:
+    DWORD protection;
+    shared_ptr<HANDLE> process_handle;
+    vector<AllocatedPage> pages;
+
+public:
+    PagePool(shared_ptr<HANDLE> phandle, DWORD protection): 
+        process_handle(phandle), protection(protection) {}
+    
+    void* malloc(size_t size, size_t alignment, shared_ptr<MemoryMapWinPage>& newpage) {
+        for (auto& page: pages) {
+            auto ptr = page.malloc(size, alignment);
+            if (ptr)
+                return ptr;
+        }
+
+        size_t pagesize = round_to_2pow(size);
+        if (pagesize < 0x4096)
+            pagesize = 0x4096;
+        auto base = VirtualAllocEx(*process_handle.get(), nullptr, pagesize, MEM_COMMIT | MEM_RESERVE, protection);
+        if (base) {
+            auto page = make_shared<MemoryMapWinPage>(this->process_handle, base, pagesize, false);
+            newpage = page;
+            pages.push_back(AllocatedPage(page));
+            return pages.back().malloc(size, alignment);
+        }
+
+        return nullptr;
+    }
+
+    bool free(void* ptr) {
+        for (auto& page: pages) {
+            if (page.free(ptr))
+                return true;
+        }
+
+        return false;
+    }
+
+    /* TODO */
+    void free_all() {
+        for (auto& page: pages) {
+            page.free_all();
+        }
+        pages.clear();
+    }
+};
+
 
 WinProcessNative::WinProcessNative(int pid): process_id(pid) {
     this->refresh_process();
@@ -20,13 +138,17 @@ WinProcessNative::WinProcessNative(int pid): process_id(pid) {
 
 void WinProcessNative::refresh_process()
 {
-    HANDLE ph = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION,
-                             FALSE, this->process_id );
+    if (!this->process_handle) {
+        HANDLE ph = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION,
+                                FALSE, this->process_id);
 
-    if (ph == NULL)
-        throw runtime_error("OpenProcess failed");
+        if (ph == NULL)
+            throw runtime_error("OpenProcess failed");
 
-    this->process_handle = std::shared_ptr<HANDLE>(new HANDLE(ph), [](HANDLE* ph) { CloseHandle(*ph); delete ph;});
+        this->process_handle = std::shared_ptr<HANDLE>(new HANDLE(ph), [](HANDLE *ph)
+                                                       { CloseHandle(*ph); delete ph; });
+    }
+    auto ph = *this->process_handle;
     this->process_maps.clear();
     this->modules.clear();
     vector<tuple<void*,size_t,string>> modules;
@@ -82,15 +204,12 @@ void WinProcessNative::refresh_process()
     for (auto& module: modules) {
         vector<shared_ptr<MemoryMap>> maps;
 
-        auto lb_func = [](std::shared_ptr<MemoryMap> &a, const void *base) {
+        auto less_func = [](std::shared_ptr<MemoryMap> &a, const void *base) {
             return reinterpret_cast<void *>(a->baseaddr()) < base;
         };
-        auto ub_func = [](const void* base, std::shared_ptr<MemoryMap> &a) {
-            return base < reinterpret_cast<void *>(a->baseaddr());
-        };
-        auto module_page = std::lower_bound(
+       auto module_page = std::lower_bound(
             this->process_maps.begin(), this->process_maps.end(), get<0>(module),
-            lb_func);
+            less_func);
 
         if (module_page == this->process_maps.end() || 
             reinterpret_cast<void*>((*module_page)->baseaddr()) != get<0>(module))
@@ -109,16 +228,19 @@ void WinProcessNative::refresh_process()
             void* sec_base = reinterpret_cast<void*>(sec.VirtualAddress + tpage->baseaddr());
             auto first_page = std::lower_bound(
                 this->process_maps.begin(), this->process_maps.end(), sec_base,
-                lb_func);
+                less_func);
             void* sec_end = reinterpret_cast<void*>(sec.VirtualAddress + tpage->baseaddr() + sec.SizeOfRawData);
             auto end_page = std::lower_bound(
                 this->process_maps.begin(), this->process_maps.end(), sec_end,
-                lb_func);
+                less_func);
 
             if (end_page - first_page > 0) {
                 vector<shared_ptr<MemoryMap>> sec_maps(first_page, end_page);
                 auto sec_map = shared_ptr<MemoryMap>(new MemoryMapSection((char *)sec.Name, std::move(sec_maps)));
                 maps.push_back(sec_map);
+            } else {
+                cerr << "unexpected module: section '"
+                     << get<2>(module) << "@" << sec.Name << "' not found or incorrect base, continue" << endl;
             }
         }
         std::sort(maps.begin(), maps.end(), [](const shared_ptr<MemoryMap> &a, const shared_ptr<MemoryMap> &b) {
@@ -130,11 +252,11 @@ void WinProcessNative::refresh_process()
 
         auto module_page_beg = std::lower_bound(
             this->process_maps.begin(), this->process_maps.end(), get<0>(module),
-            lb_func);
+            less_func);
         void* module_end = reinterpret_cast<void*>(reinterpret_cast<size_t>(get<0>(module)) + get<1>(module));
         auto module_page_end = std::lower_bound(
             this->process_maps.begin(), this->process_maps.end(), module_end,
-            lb_func);
+            less_func);
         this->process_maps.erase(module_page_beg, module_page_end);
     }
 
@@ -192,6 +314,66 @@ const WinProcessNative::ModuleMapType& WinProcessNative::get_modules() const {
 
 void WinProcessNative::refresh() {
     this->refresh_process();
+}
+
+void* WinProcessNative::malloc(size_t size, size_t alignment, DWORD protect) {
+    if (alignment == 0)
+        alignment = 1;
+
+    if (this->allocated_pages.find(protect) == this->allocated_pages.end())
+        this->allocated_pages[protect] = make_shared<PagePool>(this->process_handle, protect);
+    
+    shared_ptr<MemoryMapWinPage> page;
+    auto ptr = this->allocated_pages[protect]->malloc(size, alignment, page);
+    if (ptr) {
+        this->process_maps.push_back(page);
+        std::sort(this->process_maps.begin(), this->process_maps.end(), [](const shared_ptr<MemoryMap> &a, const shared_ptr<MemoryMap> &b) {
+            return a->baseaddr() < b->baseaddr();
+        });
+    }
+    return ptr;
+}
+void  WinProcessNative::free(void* ptr) {
+    for (auto& p: this->allocated_pages) {
+        if (p.second->free(ptr))
+            return;
+    }
+
+    throw runtime_error("WinProcessNative::free(): invalid pointer");
+}
+void  WinProcessNative::free_all() {
+    for (auto& p: this->allocated_pages) {
+        p.second->free_all();
+    }
+}
+
+bool WinProcessNative::write(MemoryMap::addr_t addr, const void* data, size_t size) {
+    auto cdata = static_cast<const char*>(data);
+    for (size_t i=0;i<size;i++) {
+        try {
+            this->set_at(addr + i, cdata[i]);
+        } catch (runtime_error&) {
+            return false;
+        }
+    }
+    this->flush();
+    return true;
+}
+bool WinProcessNative::read(MemoryMap::addr_t addr, void* data, size_t size) {
+    auto cdata = static_cast<char*>(data);
+    for (size_t i=0;i<size;i++) {
+        try {
+            cdata[i] = this->get_at(addr + i);
+        } catch(runtime_error&) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+HANDLE WinProcessNative::rawhandle() {
+    return *this->process_handle.get();
 }
 
 #endif // _WIN32 || _WIN64

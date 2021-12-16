@@ -13,14 +13,14 @@ uint32_t udpAddr = 0;
 
 #define STR(x) #x
 #define HOOK(name) { \
-    hdd->d##name = (t_##name)DetourCreateRemote(hProcess, "" STR(name) "", (void*)_##name, Hooked##name, true, &hdd->name##BackupSize); \
+    hdd->d##name = (t_##name)DetourCreateRemote(process, "" STR(name) "", (void*)_##name, Hooked##name, true, &hdd->name##BackupSize); \
     if (hdd->d##name == nullptr) { return false; } }
 #define HOOK_NATIVE(name) { \
-    hdd->d##name = (t_##name)DetourCreateRemoteNative(hProcess, "" STR(name) "", (void*)_##name, Hooked##name, true, &hdd->name##BackupSize); \
+    hdd->d##name = (t_##name)DetourCreateRemoteNative(process, "" STR(name) "", (void*)_##name, Hooked##name, true, &hdd->name##BackupSize); \
     if (hdd->d##name == nullptr) { return false; } }
-#define HOOK_NATIVE_NOTRAMP(name) DetourCreateRemoteNative(hProcess, "" STR(name) "", (void*)_##name, Hooked##name, false, &hdd->name##BackupSize)
-#define FREE_HOOK(name) FreeMemory(hProcess, (void*)hdd->d##name); hdd->d##name = 0
-#define RESTORE_JMP(name) RestoreJumper(hProcess, (void*)_##name, (void*)hdd->d##name, hdd->name##BackupSize)
+#define HOOK_NATIVE_NOTRAMP(name) DetourCreateRemoteNative(process, "" STR(name) "", (void*)_##name, Hooked##name, false, &hdd->name##BackupSize)
+#define FREE_HOOK(name) FreeMemory(process->rawhandle(), (void*)hdd->d##name); hdd->d##name = 0
+#define RESTORE_JMP(name) RestoreJumper(process->rawhandle(), (void*)_##name, (void*)hdd->d##name, hdd->name##BackupSize)
 
 extern scl::Logger g_log;
 
@@ -33,8 +33,8 @@ bool fatalFindSyscallIndexFailure = false;
 bool fatalAlreadyHookedFailure = false;
 
 #ifndef _WIN64
-extern BYTE KiFastSystemCallBackup[20];
-extern BYTE KiFastSystemCallWow64Backup[7];
+extern BYTE  KiFastSystemCallBackup[20];
+extern BYTE  KiFastSystemCallWow64Backup[7];
 extern DWORD KiFastSystemCallAddress;
 extern DWORD KiFastSystemCallWow64Address;
 #endif
@@ -78,7 +78,7 @@ t_NtWriteVirtualMemory _NtWriteVirtualMemory = 0;
 t_NtReadVirtualMemory _NtReadVirtualMemory = 0;
 t_NtOpenProcess _NtOpenProcess = 0;
 
-bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, HANDLE hProcess, BYTE * dllMemory, DWORD_PTR imageBase)
+bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, Process_t process, BYTE * dllMemory, DWORD_PTR imageBase)
 {
     hNtdll = GetModuleHandleW(L"ntdll.dll");
 
@@ -259,8 +259,8 @@ bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, HANDLE hProcess, BYTE * dllMemory, DWOR
 
             // update RVA of Wow64PrepareForException
             UINT32 rvaWow64PrepareForException;
-            ReadProcessMemory(hProcess, (LPCVOID)(((UINT_PTR)address) + (startsWithCld ? 4 : 3)), (PVOID)&rvaWow64PrepareForException,
-                sizeof(rvaWow64PrepareForException), nullptr);
+            process->read((LPCVOID)(((UINT_PTR)address) + (startsWithCld ? 4 : 3)), (PVOID)&rvaWow64PrepareForException,
+                sizeof(rvaWow64PrepareForException));
 
             // instruction is moved up 12/13 bytes. update trampoline
             rvaWow64PrepareForException += (startsWithCld ? 13 : 12);
@@ -279,23 +279,22 @@ bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, HANDLE hProcess, BYTE * dllMemory, DWOR
             // the trampoline is an identical copy of what was at the start of the function. since this
             // is not the case for us, we must preserve the original bytes in memory we deliberately set
             // aside for this purpose.
-            PVOID backup_location = VirtualAllocEx(hProcess, nullptr, sizeof(hook), MEM_COMMIT,
-                PAGE_READWRITE);
+            PVOID backup_location = process->malloc(sizeof(hook), 1, PAGE_READWRITE);
 
             hdd->dKiUserExceptionDispatcher = (decltype(hdd->dKiUserExceptionDispatcher))(backup_location);
             hdd->KiUserExceptionDispatcherBackupSize = sizeof(hook);
 
             // backup start of function
             uint8_t backup_prologue[sizeof(hook)];
-            ReadProcessMemory(hProcess, address, backup_prologue, sizeof(backup_prologue), nullptr);
-            WriteProcessMemory(hProcess, backup_location, backup_prologue, sizeof(backup_prologue), nullptr);
+            process->read(address, backup_prologue, sizeof(backup_prologue));
+            process->write(backup_location, backup_prologue, sizeof(backup_prologue));
 
             // install trampoline
             PVOID trampoline_location = (PVOID)(((UINT_PTR)address) - sizeof(trampoline));
-            WriteProcessMemory(hProcess, trampoline_location, trampoline, sizeof(trampoline), nullptr);
+            process->read(trampoline_location, trampoline, sizeof(trampoline));
 
             // install hook
-            WriteProcessMemory(hProcess, address, hook, sizeof(hook), nullptr);
+            process->write(address, hook, sizeof(hook));
         }
 #else
         HOOK(KiUserExceptionDispatcher);
@@ -353,13 +352,13 @@ bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, HANDLE hProcess, BYTE * dllMemory, DWOR
     return true;
 }
 
-bool ApplyKernel32Hook(HOOK_DLL_DATA * hdd, HANDLE hProcess, BYTE * dllMemory, DWORD_PTR imageBase)
+bool ApplyKernel32Hook(HOOK_DLL_DATA * hdd, Process_t process, BYTE * dllMemory, DWORD_PTR imageBase)
 {
     hKernel = GetModuleHandleW(L"kernel32.dll");
     hKernelbase = GetModuleHandleW(L"kernelbase.dll");
 
-    if (GetModuleBaseRemote(hProcess, L"kernel32.dll") == nullptr ||
-        (hKernelbase != nullptr && GetModuleBaseRemote(hProcess, L"kernelbase.dll") == nullptr))
+    if (GetModuleBaseRemote(process->rawhandle(), L"kernel32.dll") == nullptr ||
+        (hKernelbase != nullptr && GetModuleBaseRemote(process->rawhandle(), L"kernelbase.dll") == nullptr))
     {
         hdd->isKernel32Hooked = FALSE;
         return true;
@@ -422,10 +421,10 @@ bool ApplyKernel32Hook(HOOK_DLL_DATA * hdd, HANDLE hProcess, BYTE * dllMemory, D
     return true;
 }
 
-bool ApplyUserHook(HOOK_DLL_DATA * hdd, HANDLE hProcess, BYTE * dllMemory, DWORD_PTR imageBase)
+bool ApplyUserHook(HOOK_DLL_DATA * hdd, Process_t process, BYTE * dllMemory, DWORD_PTR imageBase)
 {
-    if (GetModuleBaseRemote(hProcess, L"user32.dll") == nullptr &&
-        GetModuleBaseRemote(hProcess, L"win32u.dll") == nullptr)
+    if (GetModuleBaseRemote(process->rawhandle(), L"user32.dll") == nullptr &&
+        GetModuleBaseRemote(process->rawhandle(), L"win32u.dll") == nullptr)
     {
         hdd->isUserDllHooked = FALSE;
         return true;
@@ -478,7 +477,7 @@ bool ApplyUserHook(HOOK_DLL_DATA * hdd, HANDLE hProcess, BYTE * dllMemory, DWORD
     {
         g_log.LogDebug(L"ApplyUserHook -> Hooking NtUserBuildHwndList");
         //HOOK_NATIVE(NtUserBuildHwndList); // Not possible here because Windows >= 8 uses a different function export
-        hdd->dNtUserBuildHwndList = (t_NtUserBuildHwndList)DetourCreateRemoteNative(hProcess, "NtUserBuildHwndList", (PVOID)_NtUserBuildHwndList,
+        hdd->dNtUserBuildHwndList = (t_NtUserBuildHwndList)DetourCreateRemoteNative(process, "NtUserBuildHwndList", (PVOID)_NtUserBuildHwndList,
             (scl::GetWindowsVersion() <= scl::OS_WIN_7 ? HookedNtUserBuildHwndList : HookedNtUserBuildHwndList_Eight),
             true, &hdd->NtUserBuildHwndListBackupSize);
         if (hdd->dNtUserBuildHwndList == nullptr)
@@ -676,24 +675,20 @@ void RestoreJumper(HANDLE hProcess, void* address, void * backupAddress, DWORD b
 
 void FreeMemory(HANDLE hProcess, void * buffer)
 {
-    if (hProcess && buffer)
-    {
-        VirtualFreeEx(hProcess, buffer, 0, MEM_RELEASE);
-    }
 }
 
-void RestoreNtdllHooks(HOOK_DLL_DATA * hdd, HANDLE hProcess)
+void RestoreNtdllHooks(HOOK_DLL_DATA * hdd, Process_t process)
 {
 #ifndef _WIN64
-    if (scl::IsWow64Process(hProcess))
+    if (scl::IsWow64Process(process->rawhandle()))
     {
-        RestoreMemory(hProcess, KiFastSystemCallWow64Address, KiFastSystemCallWow64Backup, sizeof(KiFastSystemCallWow64Backup));
+        RestoreMemory(process->rawhandle(), KiFastSystemCallWow64Address, KiFastSystemCallWow64Backup, sizeof(KiFastSystemCallWow64Backup));
     }
     else
     {
         if (KiFastSystemCallAddress != 0)
         {
-            RestoreMemory(hProcess, KiFastSystemCallAddress, KiFastSystemCallBackup, sizeof(KiFastSystemCallBackup));
+            RestoreMemory(process->rawhandle(), KiFastSystemCallAddress, KiFastSystemCallBackup, sizeof(KiFastSystemCallBackup));
         }
         else
         {
@@ -750,7 +745,7 @@ void RestoreNtdllHooks(HOOK_DLL_DATA * hdd, HANDLE hProcess)
     hdd->isNtdllHooked = FALSE;
 }
 
-void RestoreKernel32Hooks(HOOK_DLL_DATA * hdd, HANDLE hProcess)
+void RestoreKernel32Hooks(HOOK_DLL_DATA * hdd, Process_t process)
 {
     RESTORE_JMP(OutputDebugStringA);
     RESTORE_JMP(GetTickCount);
@@ -767,10 +762,10 @@ void RestoreKernel32Hooks(HOOK_DLL_DATA * hdd, HANDLE hProcess)
     hdd->isKernel32Hooked = FALSE;
 }
 
-void RestoreUserHooks(HOOK_DLL_DATA * hdd, HANDLE hProcess)
+void RestoreUserHooks(HOOK_DLL_DATA * hdd, Process_t process)
 {
 #ifndef _WIN64
-    if (!scl::IsWow64Process(hProcess) && KiFastSystemCallAddress == 0)
+    if (!scl::IsWow64Process(process->rawhandle()) && KiFastSystemCallAddress == 0)
     {
         RESTORE_JMP(NtUserBlockInput);
         RESTORE_JMP(NtUserFindWindowEx);
@@ -795,43 +790,43 @@ void RestoreUserHooks(HOOK_DLL_DATA * hdd, HANDLE hProcess)
     hdd->isUserDllHooked = FALSE;
 }
 
-void RestoreHooks(HOOK_DLL_DATA * hdd, HANDLE hProcess)
+void RestoreHooks(HOOK_DLL_DATA * hdd, Process_t process)
 {
     if (hdd->isNtdllHooked)
     {
-        RestoreNtdllHooks(hdd, hProcess);
+        RestoreNtdllHooks(hdd, process);
     }
 
     if (hdd->isKernel32Hooked)
     {
-        RestoreKernel32Hooks(hdd, hProcess);
+        RestoreKernel32Hooks(hdd, process);
     }
 
     if (hdd->isUserDllHooked)
     {
-        RestoreUserHooks(hdd, hProcess);
+        RestoreUserHooks(hdd, process);
     }
 
-    FreeMemory(hProcess, hdd->hDllImage);
+    FreeMemory(process->rawhandle(), hdd->hDllImage);
     hdd->hDllImage = 0;
 }
 
-bool ApplyHook(HOOK_DLL_DATA * hdd, HANDLE hProcess, BYTE * dllMemory, DWORD_PTR imageBase)
+bool ApplyHook(HOOK_DLL_DATA * hdd, Process_t process, BYTE * dllMemory, DWORD_PTR imageBase)
 {
     bool success = true;
     hdd->hDllImage = (HMODULE)imageBase;
 
     if (!hdd->isNtdllHooked)
     {
-        success = success && ApplyNtdllHook(hdd, hProcess, dllMemory, imageBase);
+        success = success && ApplyNtdllHook(hdd, process, dllMemory, imageBase);
     }
     if (!hdd->isKernel32Hooked)
     {
-        success = success && ApplyKernel32Hook(hdd, hProcess, dllMemory, imageBase);
+        success = success && ApplyKernel32Hook(hdd, process, dllMemory, imageBase);
     }
     if (!hdd->isUserDllHooked)
     {
-        success = success && ApplyUserHook(hdd, hProcess, dllMemory, imageBase);
+        success = success && ApplyUserHook(hdd, process, dllMemory, imageBase);
     }
 
 #ifndef _WIN64

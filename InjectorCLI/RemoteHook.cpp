@@ -1,4 +1,9 @@
 #include "RemoteHook.h"
+#include "process/win_process_native.h"
+#include "process/memory_map_module.h"
+#include "process/memory_map_win_page.h"
+#include <memory>
+#include <stdexcept>
 #include <distorm/distorm.h>
 #include <distorm/mnemonics.h>
 #include <Scylla/OsInfo.h>
@@ -6,6 +11,8 @@
 #include <Scylla/Peb.h>
 #include "ApplyHooking.h"
 #include <stdio.h>
+using namespace std;
+
 
 // GDT selector numbers on AMD64
 #define KGDT64_R3_CMCODE (2 * 16)   // user mode 32-bit code
@@ -175,7 +182,7 @@ DWORD GetSysCallIndex32(const BYTE * data)
     return (DWORD)-1; // Don't return 0 here, it is a valid syscall index
 }
 
-DWORD GetCallDestination(HANDLE hProcess, const BYTE * data, int dataSize)
+DWORD GetCallDestination(Process_t process, const BYTE * data, int dataSize)
 {
     unsigned int DecodedInstructionsCount = 0;
     _CodeInfo decomposerCi = { 0 };
@@ -212,7 +219,7 @@ DWORD GetCallDestination(HANDLE hProcess, const BYTE * data, int dataSize)
                         if (pKUSER_SHARED_DATASysCall)
                         {
                             DWORD callDestination = 0;
-                            ReadProcessMemory(hProcess, (void*)pKUSER_SHARED_DATASysCall, &callDestination, sizeof(DWORD), 0);
+                            process->read((void*)pKUSER_SHARED_DATASysCall, &callDestination, sizeof(DWORD));
                             return callDestination;
                         }
                     }
@@ -309,7 +316,7 @@ ULONG_PTR FindPattern(ULONG_PTR base, ULONG size, const UCHAR* pattern, ULONG pa
 BYTE KiFastSystemCallWow64Backup[7] = { 0 };
 DWORD KiFastSystemCallWow64Address = 0; // In wow64cpu.dll, named X86SwitchTo64BitMode prior to Windows 8
 
-void * DetourCreateRemoteWow64(void * hProcess, bool createTramp)
+void * DetourCreateRemoteWow64(Process_t process, bool createTramp)
 {
     PBYTE trampoline = nullptr;
     DWORD protect;
@@ -336,8 +343,8 @@ void * DetourCreateRemoteWow64(void * hProcess, bool createTramp)
 
         //g_log.LogDebug(L"NtQueryKey address: %x", ntQueryKey);
 
-        ReadProcessMemory(hProcess, (LPCVOID)ntQueryKey, &originalBytes, sizeof(originalBytes), 0);
-        ReadProcessMemory(hProcess, (LPCVOID)ntQueryKey, &changedBytes, sizeof(originalBytes), 0);
+        process->read((PVOID)ntQueryKey, &originalBytes, sizeof(originalBytes));
+        process->read((PVOID)ntQueryKey, &changedBytes, sizeof(originalBytes));
 
         memcpy(originalBytes, syscallAddressBytes, sizeof(syscallAddressBytes));
         memcpy(changedBytes, syscallAddressBytes, sizeof(syscallAddressBytes));
@@ -358,7 +365,7 @@ void * DetourCreateRemoteWow64(void * hProcess, bool createTramp)
             PVOID* pWow64Transition = (PVOID*)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "Wow64Transition");
             ULONG Wow64Transition = 0;
             if (pWow64Transition != nullptr &&
-                ReadProcessMemory(hProcess, pWow64Transition, &Wow64Transition, sizeof(Wow64Transition), nullptr) &&
+                process->read(pWow64Transition, &Wow64Transition, sizeof(Wow64Transition)) &&
                 Wow64Transition != 0)
             {
                 if (((PUCHAR)Wow64Transition)[0] != 0xEA)
@@ -373,7 +380,7 @@ void * DetourCreateRemoteWow64(void * hProcess, bool createTramp)
 
         if (KiFastSystemCallWow64Address == 0)
         {
-            ULONG64 Wow64cpu = (ULONG64)scl::Wow64GetModuleHandle64(hProcess, L"wow64cpu.dll");
+            ULONG64 Wow64cpu = (ULONG64)scl::Wow64GetModuleHandle64(process->rawhandle(), L"wow64cpu.dll");
             if (Wow64cpu == 0 || Wow64cpu > (ULONG32)Wow64cpu) // wow64cpu.dll should always be below 4GB
             {
                 MessageBoxA(nullptr, "Failed to obtain address of wow64cpu.dll!", "ScyllaHide", MB_ICONERROR);
@@ -405,7 +412,7 @@ void * DetourCreateRemoteWow64(void * hProcess, bool createTramp)
             }
         }
 
-        if (ReadProcessMemory(hProcess, (void*)KiFastSystemCallWow64Address, KiFastSystemCallWow64Backup, sizeof(KiFastSystemCallWow64Backup), nullptr))
+        if (process->read((void*)KiFastSystemCallWow64Address, KiFastSystemCallWow64Backup, sizeof(KiFastSystemCallWow64Backup)))
         {
             if (KiFastSystemCallWow64Backup[5] == (KGDT64_R3_CMCODE | RPL_MASK))
             {
@@ -417,13 +424,12 @@ void * DetourCreateRemoteWow64(void * hProcess, bool createTramp)
                 KiFastSystemCallWow64Backup[5] = (KGDT64_R3_CODE | RPL_MASK);
             }
 
-            NativeCallContinue = VirtualAllocEx(hProcess, nullptr, sizeof(KiFastSystemCallWow64Backup), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-            if (!WriteProcessMemory(hProcess, NativeCallContinue, KiFastSystemCallWow64Backup, sizeof(KiFastSystemCallWow64Backup), nullptr))
+            NativeCallContinue = process->malloc(sizeof(KiFastSystemCallWow64Backup), 1, PAGE_EXECUTE_READWRITE);
+            if (!process->write(NativeCallContinue, KiFastSystemCallWow64Backup, sizeof(KiFastSystemCallWow64Backup)))
             {
                 MessageBoxA(nullptr, "Failed to write NativeCallContinue routine", "ScyllaHide", MB_ICONERROR);
                 return nullptr;
             }
-            VirtualProtectEx(hProcess, NativeCallContinue, sizeof(KiFastSystemCallWow64Backup), PAGE_EXECUTE_READ, &protect);
         }
         else
         {
@@ -434,7 +440,7 @@ void * DetourCreateRemoteWow64(void * hProcess, bool createTramp)
 
     if (funcSize != 0 && createTramp)
     {
-        trampoline = (PBYTE)VirtualAllocEx(hProcess, nullptr, sizeof(changedBytes), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+        trampoline = (PBYTE)process->malloc(sizeof(changedBytes), PAGE_EXECUTE_READWRITE);
         if (trampoline == nullptr)
             return nullptr;
 
@@ -444,30 +450,20 @@ void * DetourCreateRemoteWow64(void * hProcess, bool createTramp)
 
         memcpy(changedBytes + callOffset + 5 + sizeof(KiFastSystemCallWow64Backup), originalBytes + callOffset + callSize, funcSize - callOffset - callSize);
 
-        WriteProcessMemory(hProcess, trampoline, changedBytes, sizeof(changedBytes), nullptr);
-        VirtualProtectEx(hProcess, trampoline, sizeof(changedBytes), PAGE_EXECUTE_READ, &protect);
+        process->write(trampoline, changedBytes, sizeof(changedBytes));
     }
 
     if (!onceNativeCallContinueWasSet)
     {
-        if (VirtualProtectEx(hProcess, (void *)KiFastSystemCallWow64Address, detourLenWow64FarJmp, PAGE_EXECUTE_READWRITE, &protect))
+        // Write a faux WOW64 transition far jmp with disregard for space used
+        UCHAR jumperBytes[detourLenWow64FarJmp];
+        RtlZeroMemory(jumperBytes, sizeof(jumperBytes));
+        WriteWow64Jumper((PBYTE)HookedNativeCallInternal, jumperBytes);
+        if (!process->write((void *)KiFastSystemCallWow64Address, jumperBytes, detourLenWow64FarJmp))
         {
-            // Write a faux WOW64 transition far jmp with disregard for space used
-            UCHAR jumperBytes[detourLenWow64FarJmp];
-            RtlZeroMemory(jumperBytes, sizeof(jumperBytes));
-            WriteWow64Jumper((PBYTE)HookedNativeCallInternal, jumperBytes);
-            if (!WriteProcessMemory(hProcess, (void *)KiFastSystemCallWow64Address, jumperBytes, detourLenWow64FarJmp, nullptr))
-            {
-                MessageBoxA(nullptr, "Failed to write KiFastSystemCall/X86SwitchTo64BitMode replacement to wow64cpu.dll", "ScyllaHide", MB_ICONERROR);
-            }
-
-            VirtualProtectEx(hProcess, (void *)KiFastSystemCallWow64Address, detourLenWow64FarJmp, protect, &protect);
+            MessageBoxA(nullptr, "Failed to write KiFastSystemCall/X86SwitchTo64BitMode replacement to wow64cpu.dll", "ScyllaHide", MB_ICONERROR);
         }
-        else
-        {
-            MessageBoxA(nullptr, "Failed to unprotect KiFastSystemCall/X86SwitchTo64BitMode in wow64cpu.dll", "ScyllaHide", MB_ICONERROR);
-        }
-    }
+   }
 
     return trampoline;
 }
@@ -479,7 +475,7 @@ BYTE KiFastSystemCallBackup[20] = { 0 };
 DWORD KiFastSystemCallAddress = 0;
 DWORD KiFastSystemCallBackupSize = 0;
 
-void * DetourCreateRemoteX86(void * hProcess, bool createTramp)
+void * DetourCreateRemoteX86(Process_t process, bool createTramp)
 {
     PBYTE trampoline = 0;
     DWORD protect;
@@ -488,19 +484,18 @@ void * DetourCreateRemoteX86(void * hProcess, bool createTramp)
 
     DWORD callSize = 0;
     DWORD callOffset = GetCallOffset(originalBytes, sizeof(originalBytes), &callSize);
-    KiFastSystemCallAddress = GetCallDestination(hProcess, originalBytes, sizeof(originalBytes));
+    KiFastSystemCallAddress = GetCallDestination(process, originalBytes, sizeof(originalBytes));
 
     if (!onceNativeCallContinue)
     {
-        ReadProcessMemory(hProcess, (void*)KiFastSystemCallAddress, KiFastSystemCallBackup, sizeof(KiFastSystemCallBackup), 0);
+        process->read((void*)KiFastSystemCallAddress, KiFastSystemCallBackup, sizeof(KiFastSystemCallBackup));
         KiFastSystemCallBackupSize = GetFunctionSizeRETN(KiFastSystemCallBackup, sizeof(KiFastSystemCallBackup));
         if (KiFastSystemCallBackupSize)
         {
-            NativeCallContinue = VirtualAllocEx(hProcess, 0, KiFastSystemCallBackupSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+            NativeCallContinue = process->malloc(KiFastSystemCallBackupSize, 1, PAGE_EXECUTE_READWRITE);
             if (NativeCallContinue)
             {
-                WriteProcessMemory(hProcess, NativeCallContinue, KiFastSystemCallBackup, KiFastSystemCallBackupSize, 0);
-                VirtualProtectEx(hProcess, NativeCallContinue, sizeof(KiFastSystemCallBackupSize), PAGE_EXECUTE_READ, &protect);
+                process->write(NativeCallContinue, KiFastSystemCallBackup, KiFastSystemCallBackupSize);
             }
             else
             {
@@ -515,7 +510,7 @@ void * DetourCreateRemoteX86(void * hProcess, bool createTramp)
 
     if (funcSize && createTramp)
     {
-        trampoline = (PBYTE)VirtualAllocEx(hProcess, nullptr, sizeof(changedBytes), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+        trampoline = (PBYTE)process->malloc(sizeof(changedBytes), 1, PAGE_EXECUTE_READWRITE);
         if (!trampoline)
             return nullptr;
 
@@ -525,43 +520,38 @@ void * DetourCreateRemoteX86(void * hProcess, bool createTramp)
 
         memcpy(changedBytes + callOffset + 5 + KiFastSystemCallBackupSize, originalBytes + callOffset + callSize, funcSize - callOffset - callSize);
 
-        WriteProcessMemory(hProcess, trampoline, changedBytes, sizeof(changedBytes), 0);
-        VirtualProtectEx(hProcess, trampoline, sizeof(changedBytes), PAGE_EXECUTE_READ, &protect);
+        process->write(trampoline, changedBytes, sizeof(changedBytes));
     }
 
     if (!onceNativeCallContinue)
     {
         DWORD_PTR patchAddr = (DWORD_PTR)KiFastSystemCallAddress - 5;
 
-        if (VirtualProtectEx(hProcess, (void *)patchAddr, 5 + 2, PAGE_EXECUTE_READWRITE, &protect))
-        {
-            WriteJumper((PBYTE)patchAddr, (PBYTE)HookedNativeCallInternal, KiFastSystemCallJmpPatch, false);
-            WriteProcessMemory(hProcess, (void *)patchAddr, KiFastSystemCallJmpPatch, 5 + 2, 0);
+        WriteJumper((PBYTE)patchAddr, (PBYTE)HookedNativeCallInternal, KiFastSystemCallJmpPatch, false);
+        process->write((void *)patchAddr, KiFastSystemCallJmpPatch, 5 + 2);
 
-            VirtualProtectEx(hProcess, (void *)patchAddr, 5 + 2, protect, &protect);
-        }
         onceNativeCallContinue = true;
     }
 
     return trampoline;
 }
 
-void * DetourCreateRemote32(void * hProcess, const char* funcName, void * lpFuncOrig, void * lpFuncDetour, bool createTramp, unsigned long * backupSize)
+void * DetourCreateRemote32(Process_t process, const char* funcName, void * lpFuncOrig, void * lpFuncDetour, bool createTramp, unsigned long * backupSize)
 {
-    if (!scl::IsWow64Process(hProcess))
+    if (!scl::IsWow64Process(process->rawhandle()))
     {
         // Handle special cases on native x86 where hooks should be placed inside the function and not at KiFastSystemCall.
         // TODO: why does DetourCreateRemoteX86 even exist? DetourCreateRemote works fine on any OS
         if (scl::GetWindowsVersion() >= scl::OS_WIN_8)
         {
             // The native x86 syscall structure was changed in Windows 8. https://github.com/x64dbg/ScyllaHide/issues/49
-            return DetourCreateRemote(hProcess, funcName, lpFuncOrig, lpFuncDetour, createTramp, backupSize);
+            return DetourCreateRemote(process, funcName, lpFuncOrig, lpFuncDetour, createTramp, backupSize);
         }
 
         if (g_settings.profile_name().find(L"Obsidium") != std::wstring::npos)
         {
             // This is an extremely lame hack because Obsidium doesn't like where we put our hooks
-            return DetourCreateRemote(hProcess, funcName, lpFuncOrig, lpFuncDetour, createTramp, backupSize);
+            return DetourCreateRemote(process, funcName, lpFuncOrig, lpFuncDetour, createTramp, backupSize);
         }
     }
 
@@ -571,7 +561,7 @@ void * DetourCreateRemote32(void * hProcess, const char* funcName, void * lpFunc
     memset(changedBytes, 0x90, sizeof(changedBytes));
     memset(originalBytes, 0x90, sizeof(originalBytes));
 
-    if (!ReadProcessMemory(hProcess, lpFuncOrig, originalBytes, sizeof(originalBytes), nullptr))
+    if (!process->read(lpFuncOrig, originalBytes, sizeof(originalBytes)))
     {
         MessageBoxA(nullptr, "DetourCreateRemoteX86->ReadProcessMemory failed.", "ScyllaHide", MB_ICONERROR);
         return nullptr;
@@ -598,14 +588,14 @@ void * DetourCreateRemote32(void * hProcess, const char* funcName, void * lpFunc
     HookNative[countNativeHooks].hookedFunction = lpFuncDetour;
 
     PVOID result;
-    if (!scl::IsWow64Process(hProcess))
+    if (!scl::IsWow64Process(process->rawhandle()))
     {
-        result = DetourCreateRemoteX86(hProcess, createTramp);
+        result = DetourCreateRemoteX86(process, createTramp);
     }
     else
     {
         HookNative[countNativeHooks].ecxValue = GetEcxSysCallIndex32(originalBytes, sizeof(originalBytes));
-        result = DetourCreateRemoteWow64(hProcess, createTramp);
+        result = DetourCreateRemoteWow64(process, createTramp);
     }
 
     countNativeHooks++;
@@ -615,7 +605,7 @@ void * DetourCreateRemote32(void * hProcess, const char* funcName, void * lpFunc
 
 #endif
 
-void * DetourCreateRemote(void * hProcess, const char* funcName, void * lpFuncOrig, void * lpFuncDetour, bool createTramp, DWORD * backupSize)
+void * DetourCreateRemote(Process_t process, const char* funcName, void * lpFuncOrig, void * lpFuncDetour, bool createTramp, DWORD * backupSize)
 {
     BYTE originalBytes[50] = { 0 };
     BYTE tempSpace[1000] = { 0 };
@@ -627,11 +617,8 @@ void * DetourCreateRemote(void * hProcess, const char* funcName, void * lpFuncOr
     if (fatalFindSyscallIndexFailure || fatalAlreadyHookedFailure)
         return nullptr; // Don't spam user with repeated error message boxes
 
-    if (!ReadProcessMemory(hProcess, lpFuncOrig, originalBytes, sizeof(originalBytes), nullptr))
-    {
-        MessageBoxA(nullptr, "DetourCreateRemote->ReadProcessMemory failed.", "ScyllaHide", MB_ICONERROR);
+    if (!process->read(lpFuncOrig, originalBytes, sizeof(originalBytes)))
         return nullptr;
-    }
 
     ClearSyscallBreakpoint(funcName, originalBytes);
 
@@ -645,11 +632,7 @@ void * DetourCreateRemote(void * hProcess, const char* funcName, void * lpFuncOr
 #endif
     if (isHooked)
     {
-        fatalAlreadyHookedFailure = true;
-        char errorMessage[256];
-        _snprintf_s(errorMessage, sizeof(errorMessage), sizeof(errorMessage) - sizeof(char),
-            "Error: %hs is already hooked!", funcName);
-        MessageBoxA(nullptr, errorMessage, "ScyllaHide", MB_ICONERROR);
+        throw runtime_error("Error: function '" + string(funcName) + "' is already hooked.");
         return nullptr;
     }
 
@@ -659,34 +642,28 @@ void * DetourCreateRemote(void * hProcess, const char* funcName, void * lpFuncOr
     {
         *backupSize = detourLen;
 
-        trampoline = (PBYTE)VirtualAllocEx(hProcess, 0, detourLen + minDetourLen, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+        trampoline = (PBYTE)process->malloc(detourLen + minDetourLen, 1, PAGE_EXECUTE_READWRITE);
         if (!trampoline)
             return 0;
 
-        WriteProcessMemory(hProcess, trampoline, originalBytes, detourLen, 0);
+        if (!process->write(trampoline, originalBytes, detourLen)) 
+            return 0;
 
         ZeroMemory(tempSpace, sizeof(tempSpace));
         WriteJumper(trampoline + detourLen, (PBYTE)lpFuncOrig + detourLen, tempSpace, false);
-        WriteProcessMemory(hProcess, trampoline + detourLen, tempSpace, minDetourLen, 0);
-        VirtualProtectEx(hProcess, trampoline, detourLen + minDetourLen, PAGE_EXECUTE_READ, &protect);
+        process->write(trampoline + detourLen, tempSpace, minDetourLen);
     }
 
-    if (VirtualProtectEx(hProcess, lpFuncOrig, detourLen, PAGE_EXECUTE_READWRITE, &protect))
-    {
-        ZeroMemory(tempSpace, sizeof(tempSpace));
-        WriteJumper((PBYTE)lpFuncOrig, (PBYTE)lpFuncDetour, tempSpace, scl::IsWindows64() && !scl::IsWow64Process(NtCurrentProcess));
-        WriteProcessMemory(hProcess, lpFuncOrig, tempSpace, minDetourLen, 0);
-
-        VirtualProtectEx(hProcess, lpFuncOrig, detourLen, protect, &protect);
-        success = true;
-    }
+    ZeroMemory(tempSpace, sizeof(tempSpace));
+    WriteJumper((PBYTE)lpFuncOrig, (PBYTE)lpFuncDetour, tempSpace, scl::IsWindows64() && !scl::IsWow64Process(NtCurrentProcess));
+    process->write(lpFuncOrig, tempSpace, minDetourLen);
+    success = true;
 
     if (createTramp)
     {
         if (!success)
         {
-            VirtualFree(trampoline, 0, MEM_RELEASE);
-            trampoline = 0;
+            trampoline = nullptr;
         }
         return trampoline;
     }

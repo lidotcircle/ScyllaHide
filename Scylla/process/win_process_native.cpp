@@ -351,6 +351,8 @@ void  WinProcessNative::free_all() {
 }
 
 bool WinProcessNative::write(MemoryMap::addr_t addr, const void* data, size_t size) {
+    cout << "write: 0x" << reinterpret_cast<void*>(addr) << " " << size << endl;
+    // return true;
     auto cdata = static_cast<const char*>(data);
     for (size_t i=0;i<size;i++) {
         try {
@@ -373,6 +375,19 @@ bool WinProcessNative::read(MemoryMap::addr_t addr, void* data, size_t size) {
     }
 
     return true;
+}
+bool WinProcessNative::write(addr_t addr, vector<char> data) {
+    return this->write(addr, data.data(), data.size());
+}
+vector<char> WinProcessNative::read (addr_t addr, size_t size) {
+    vector<char> data(size);
+    return this->read(addr, data.data(), size) ? data : vector<char>();
+}
+
+bool WinProcessNative::isWow64Process() const {
+    auto isWow64 = FALSE;
+    auto _this = const_cast<WinProcessNative*>(this);
+    return ::IsWow64Process(_this->rawhandle(), &isWow64) && (isWow64 == TRUE);
 }
 
 HANDLE WinProcessNative::rawhandle() {

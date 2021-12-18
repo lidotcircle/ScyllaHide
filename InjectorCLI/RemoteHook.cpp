@@ -319,6 +319,7 @@ DWORD KiFastSystemCallWow64Address = 0; // In wow64cpu.dll, named X86SwitchTo64B
 
 void * DetourCreateRemoteWow64(Process_t process, bool createTramp)
 {
+    cout << "DetourCreateRemoteWow64" << endl;
     PBYTE trampoline = nullptr;
     DWORD protect;
     bool onceNativeCallContinueWasSet = onceNativeCallContinue;
@@ -426,6 +427,7 @@ void * DetourCreateRemoteWow64(Process_t process, bool createTramp)
             }
 
             NativeCallContinue = process->malloc(sizeof(KiFastSystemCallWow64Backup), 1, PAGE_EXECUTE_READWRITE);
+            cout << "NativeCallContinue: " << NativeCallContinue << endl;
             if (!process->write(NativeCallContinue, KiFastSystemCallWow64Backup, sizeof(KiFastSystemCallWow64Backup)))
             {
                 MessageBoxA(nullptr, "Failed to write NativeCallContinue routine", "ScyllaHide", MB_ICONERROR);
@@ -451,6 +453,7 @@ void * DetourCreateRemoteWow64(Process_t process, bool createTramp)
 
         memcpy(changedBytes + callOffset + 5 + sizeof(KiFastSystemCallWow64Backup), originalBytes + callOffset + callSize, funcSize - callOffset - callSize);
 
+        cout << "trampoline: " << (void*)trampoline << endl;
         process->write(trampoline, changedBytes, sizeof(changedBytes));
     }
 
@@ -460,6 +463,7 @@ void * DetourCreateRemoteWow64(Process_t process, bool createTramp)
         UCHAR jumperBytes[detourLenWow64FarJmp];
         RtlZeroMemory(jumperBytes, sizeof(jumperBytes));
         WriteWow64Jumper((PBYTE)HookedNativeCallInternal, jumperBytes);
+        cout << "KiFastSystemCallWow64Address: " << (void*)KiFastSystemCallWow64Address << endl;
         if (!process->write((void *)KiFastSystemCallWow64Address, jumperBytes, detourLenWow64FarJmp))
         {
             MessageBoxA(nullptr, "Failed to write KiFastSystemCall/X86SwitchTo64BitMode replacement to wow64cpu.dll", "ScyllaHide", MB_ICONERROR);
@@ -478,6 +482,7 @@ DWORD KiFastSystemCallBackupSize = 0;
 
 void * DetourCreateRemoteX86(Process_t process, bool createTramp)
 {
+    cout << "DetourCreateRemoteX86" << endl;
     PBYTE trampoline = 0;
     DWORD protect;
 
@@ -539,6 +544,7 @@ void * DetourCreateRemoteX86(Process_t process, bool createTramp)
 
 void * DetourCreateRemote32(Process_t process, const char* funcName, void * lpFuncOrig, void * lpFuncDetour, bool createTramp, unsigned long * backupSize)
 {
+    cout << "DetourCreateRemote32(" << funcName << ", " << lpFuncOrig << ", " << lpFuncDetour << ")" << endl;
     if (!scl::IsWow64Process(process->rawhandle()))
     {
         // Handle special cases on native x86 where hooks should be placed inside the function and not at KiFastSystemCall.
@@ -608,6 +614,7 @@ void * DetourCreateRemote32(Process_t process, const char* funcName, void * lpFu
 
 void * DetourCreateRemote(Process_t process, const char* funcName, void * lpFuncOrig, void * lpFuncDetour, bool createTramp, DWORD * backupSize)
 {
+    cout << "DetourCreateRemote(" << funcName << ", " << lpFuncOrig << ", " << lpFuncDetour << ")" << endl;
     BYTE originalBytes[50] = { 0 };
     BYTE tempSpace[1000] = { 0 };
     PBYTE trampoline = 0;

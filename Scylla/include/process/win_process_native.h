@@ -14,12 +14,19 @@ typedef int HANDLE;
 
 class MemoryMapModule;
 class PagePool;
+class HookHandle {
+public:
+    virtual void* trampoline() = 0;
+    virtual ~HookHandle() = default;
+};
 
 class WinProcessNative : public MemoryMapCollection
 {
 public:
     using ProcessHandle = std::shared_ptr<HANDLE>;
     using ModuleMapType = std::map<std::string,std::shared_ptr<MemoryMapModule>>;
+    using addr_t  = typename MemoryMap::addr_t;
+    using hook_t  = std::unique_ptr<HookHandle>;
 
 private:
     int process_id;
@@ -43,14 +50,23 @@ public:
     void  free(void* ptr);
     void  free_all();
 
-    bool write(MemoryMap::addr_t addr, const void* data, size_t size);
-    bool read (MemoryMap::addr_t addr, void* data, size_t size);
+    bool write(addr_t addr, const void* data, size_t size);
+    bool read (addr_t addr, void* data, size_t size);
+    bool write(addr_t addr, std::vector<char> data);
+    std::vector<char> read (addr_t addr, size_t size);
 
     inline bool write(void* addr, const void* data, size_t size) {return this->write(reinterpret_cast<MemoryMap::addr_t>(addr), data, size);}
     inline bool read (void* addr, void* data, size_t size) {return this->read (reinterpret_cast<MemoryMap::addr_t>(addr), data, size);}
+    inline bool write(void* addr, std::vector<char> data) {return this->write(reinterpret_cast<MemoryMap::addr_t>(addr), data);}
+    inline std::vector<char> read(void* addr, size_t size) {return this->read (reinterpret_cast<MemoryMap::addr_t>(addr), size);}
 
+    bool isWow64Process() const;
     HANDLE rawhandle();
     void reopen(DWORD add_desiredAcess);
+
+    hook_t hook(addr_t original, addr_t hook);
+    bool   unhook(hook_t hook);
+    inline hook_t hook(void* original, void* hook) {return this->hook(reinterpret_cast<addr_t>(original), reinterpret_cast<addr_t>(hook));}
 
     void refresh();
 };

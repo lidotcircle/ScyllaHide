@@ -114,6 +114,7 @@ string GetNameFromHandle(HANDLE hFile)
 static set<string> requireDll = {
     "ntdll.dll",
     "kernel32.dll",
+    "user32.dll",
 };
 
 int main(int argc, char* argv[])
@@ -305,7 +306,8 @@ bool startInjectionProcess(Process_t process, BYTE * dllMemory)
     bool success = false;
     if (injectDll)
     {
-        LPVOID remoteImageBase = MapModuleToProcess(process->rawhandle(), dllMemory, true);
+        LPVOID remoteImageBase = MapModuleToProcess(process->rawhandle(), dllMemory, false);
+        process->refresh();
         if (remoteImageBase != nullptr)
         {
             FillHookDllData(process->rawhandle(), &g_hdd);
@@ -313,6 +315,7 @@ bool startInjectionProcess(Process_t process, BYTE * dllMemory)
 
             if (StartHooking(process, dllMemory, (DWORD_PTR)remoteImageBase))
             {
+                cout << remoteImageBase << " " << reinterpret_cast<void*>(hookDllDataAddressRva) << endl;
                 if (process->write((LPVOID)((DWORD_PTR)hookDllDataAddressRva + (DWORD_PTR)remoteImageBase), &g_hdd, sizeof(HOOK_DLL_DATA)))
                 {
                     printf("Hook injection successful, image base %p\n", remoteImageBase);
@@ -350,6 +353,7 @@ bool startInjection(Process_t process, const char * dllPath)
         } catch (const std::exception& e) {
             cout << "startInjection exception: " << e.what() << endl;
         }
+        /*
         if (g_settings.opts().killAntiAttach)
         {
             if (!ApplyAntiAntiAttach(process))
@@ -357,6 +361,7 @@ bool startInjection(Process_t process, const char * dllPath)
                 printf("Anti-Anti-Attach failed\n");
             }
         }
+        */
         free(dllMemory);
     }
     else

@@ -132,9 +132,10 @@ bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, Process_t process, BYTE * dllMemory, DW
     _NtQueryPerformanceCounter = (t_NtQueryPerformanceCounter)GetProcAddress(hNtdll, "NtQueryPerformanceCounter");
     _NtResumeThread = (t_NtResumeThread)GetProcAddress(hNtdll, "NtResumeThread");
     _NtWriteVirtualMemory = (t_NtWriteVirtualMemory)GetProcAddress(hNtdll, "NtWriteVirtualMemory");
-    _NtReadVirtualMemory = (t_NtReadVirtualMemory)GetProcAddress(hNtdll, "NtWriteVirtualMemory");
-    _NtOpenProcess = (t_NtOpenProcess)GetProcAddress(hNtdll, "NtWriteVirtualMemory");
+    _NtReadVirtualMemory = (t_NtReadVirtualMemory)GetProcAddress(hNtdll, "NtReadVirtualMemory");
+    _NtOpenProcess = (t_NtOpenProcess)GetProcAddress(hNtdll, "NtOpenProcess");
     
+    /*
     g_log.LogDebug(L"ApplyNtdllHook -> _NtSetInformationThread %p _NtQuerySystemInformation %p _NtQueryInformationProcess %p _NtSetInformationProcess %p _NtQueryObject %p",
         _NtSetInformationThread,
         _NtQuerySystemInformation,
@@ -333,20 +334,28 @@ bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, Process_t process, BYTE * dllMemory, DW
         g_log.LogDebug(L"ApplyNtdllHook -> Hooking NtResumeThread for RUNPE UNPACKER");
         HOOK_NATIVE(NtResumeThread);
     }
+    */
 
     if (true)
     {
         hdd->udpIPCAddr = udpAddr;
         hdd->udpIPCPort = udpPort;
 
+cout << _NtWriteVirtualMemory << endl;
         g_log.LogDebug(L"ApplyNtdllHook -> Hooking NtWriteVirtualMemory");
-        HOOK_NATIVE(NtWriteVirtualMemory);
+        // HOOK_NATIVE(NtWriteVirtualMemory);
+        auto handle = process->hook(NtWriteVirtualMemory, HookedNtWriteVirtualMemory);
+        hdd->dNtWriteVirtualMemory = (decltype(hdd->dNtWriteVirtualMemory))handle->trampoline();
 
+/*
+cout << _NtReadVirtualMemory << endl;
         g_log.LogDebug(L"ApplyNtdllHook -> Hooking NtReadVirtualMemory");
         HOOK_NATIVE(NtReadVirtualMemory);
 
+cout << _NtOpenProcess << endl;
         g_log.LogDebug(L"ApplyNtdllHook -> Hooking NtOpenProcess");
         HOOK_NATIVE(NtOpenProcess);
+*/
     }
 
     hdd->isNtdllHooked = TRUE;
@@ -818,10 +827,11 @@ bool ApplyHook(HOOK_DLL_DATA * hdd, Process_t process, BYTE * dllMemory, DWORD_P
     bool success = true;
     hdd->hDllImage = (HMODULE)imageBase;
 
-    if (!hdd->isNtdllHooked)
+    if (true)
     {
         success = success && ApplyNtdllHook(hdd, process, dllMemory, imageBase);
     }
+    /*
     if (!hdd->isKernel32Hooked)
     {
         success = success && ApplyKernel32Hook(hdd, process, dllMemory, imageBase);
@@ -830,6 +840,7 @@ bool ApplyHook(HOOK_DLL_DATA * hdd, Process_t process, BYTE * dllMemory, DWORD_P
     {
         success = success && ApplyUserHook(hdd, process, dllMemory, imageBase);
     }
+    */
 
 #ifndef _WIN64
     hdd->NativeCallContinue = NativeCallContinue;

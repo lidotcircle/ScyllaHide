@@ -1,7 +1,7 @@
 #include <Winsock2.h>
+#include <WinUser.h>
 #include <new.h>
 #include <assert.h>
-#include <stdio.h>
 #include "HookMain.h"
 #include "LogClient.h"
 
@@ -14,7 +14,24 @@ static decltype(WSAStartup)*  fWSAStartup  = nullptr;
 static decltype(WSACleanup)*  fWSACleanup  = nullptr;
 
 static decltype(MessageBoxA)* fMessageBoxA = nullptr;
-static int (*fvsprintf_s)(const char* buf, const size_t, const char* fmt, va_list arg)  = nullptr;
+static decltype(wvsprintfA)*  fwvsprintfA  = nullptr;
+static int fvsprintf(char* buf, const char* fmt, va_list arg) {
+    if (!fwvsprintfA)
+        fwvsprintfA = (decltype(fwvsprintfA))GetProcAddress(GetModuleHandleA("user32.DLL"), "wvsprintfA");
+    
+    if (!fwvsprintfA)
+        return 0;
+
+    return fwvsprintfA(buf, fmt, arg);
+}
+static int fsprintf(char* buf, const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    size_t n = fvsprintf(buf, fmt, args);
+    va_end(args);
+
+    return n;
+};
 static int MessageBoxN(HWND wnd, LPCSTR text, LPCSTR caption, UINT type)
 {
     if (!fMessageBoxA)
@@ -67,16 +84,10 @@ void LogClient::send(const char* buf, __int32 bufsize) {
 }
 
 void LogClient::sendfmt(const char* fmt, ...) {
-    if (fvsprintf_s == nullptr)
-        fvsprintf_s = (decltype(fvsprintf_s))GetProcAddress(LoadLibraryA("kernel32.dll"), "vsprintf_s");
-    
-    if (fvsprintf_s == nullptr)
-        return;
-
     char buf[4096];
     va_list args;
     va_start(args, fmt);
-    size_t n = fvsprintf_s(buf, sizeof(buf), fmt, args);
+    size_t n = fvsprintf(buf, fmt, args);
     va_end(args);
     this->send(buf, n);
 }

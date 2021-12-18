@@ -2,6 +2,8 @@
 #include <cassert>
 #include <chrono>
 #include <iomanip>
+#include <iostream>
+using namespace std;
 #include "Util.h"
 
 const wchar_t scl::Logger::kFileName[] = L"scylla_hide.log";
@@ -58,6 +60,8 @@ void scl::Logger::LogGeneric(const char *prefix, LogCbA cb_a, LogCbW cb_w, const
     va_copy(vap, ap);
     auto strw = scl::vfmtw(fmt, ap);
     va_end(ap);
+
+    wcout << strw << endl;
 
     if (cb_w)
         cb_w(strw.c_str());

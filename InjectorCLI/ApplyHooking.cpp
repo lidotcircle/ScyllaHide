@@ -345,6 +345,13 @@ cout << _NtWriteVirtualMemory << endl;
         g_log.LogDebug(L"ApplyNtdllHook -> Hooking NtWriteVirtualMemory");
         // HOOK_NATIVE(NtWriteVirtualMemory);
         auto handle = process->hook(NtWriteVirtualMemory, HookedNtWriteVirtualMemory);
+        auto ox = process->unhook(std::move(handle));
+        handle = process->hook(NtWriteVirtualMemory, HookedNtWriteVirtualMemory);
+
+        auto handle2 = process->hook(NtWriteVirtualMemory, HookedNtWriteVirtualMemory);
+        hdd->dNtWriteVirtualMemory = (decltype(hdd->dNtWriteVirtualMemory))handle2->trampoline();
+
+        process->unhook(std::move(handle2));
         hdd->dNtWriteVirtualMemory = (decltype(hdd->dNtWriteVirtualMemory))handle->trampoline();
 
 /*

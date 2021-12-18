@@ -4,6 +4,7 @@
 #include "process/memory_map_module.h"
 #include "process/memory_map_section.h"
 #include <distorm/distorm.h>
+#include <distorm/mnemonics.h>
 #include <stdexcept>
 #include <memory>
 #include <vector>
@@ -96,6 +97,71 @@ static int GetDetourLen(const void * lpStart, const int minSize)
     return totalLen;
 }
 
+static vector<char> RedirectRelativeJmp(void* old_addr, void* new_addr, const vector<char>& instrucs) {
+    instrucs.data();
+
+    _CodeInfo decomposerCi = { 0 };
+    decomposerCi.code = (const uint8_t*)instrucs.data();
+    decomposerCi.codeLen = instrucs.size();
+    decomposerCi.codeOffset = (LONG_PTR)old_addr;
+    decomposerCi.dt = DecodingType;
+    shared_ptr<_DInst> dresult(new _DInst[instrucs.size()], std::default_delete<_DInst[]>());
+    size_t DecodedInstructionsCount = 0;
+
+    if (!distorm_decompose(&decomposerCi, dresult.get(), instrucs.size(), &DecodedInstructionsCount))
+        return vector<char>();
+    
+    vector<char> new_instrucs;
+    size_t cn = 0;
+    _DInst dinst = dinst = dresult.get()[0];
+    for (size_t i = 0; i < DecodedInstructionsCount;
+         cn += dinst.size, i++, dinst = dresult.get()[i])
+    {
+        if (dinst.ops[0].type != O_PC || dinst.opcode == I_JCXZ || dinst.opcode == I_JECXZ) {
+            new_instrucs.insert(new_instrucs.end(), instrucs.begin() + cn, instrucs.begin() + cn + dinst.size);
+            continue;
+        }
+
+        // rel8 and target in this block
+        if (dinst.size == 2) {
+            int dest = dinst.imm.addr + cn + 2;
+            if (dest >= 0 && dest < instrucs.size()) {
+                new_instrucs.insert(new_instrucs.end(), instrucs.begin() + cn, instrucs.begin() + cn + dinst.size);
+                continue;
+            }
+        }
+
+        auto a1 = reinterpret_cast<uintptr_t>(new_addr) + new_instrucs.size();
+        auto a2 = reinterpret_cast<uintptr_t>(old_addr) + cn;
+        DWORD dest = dinst.imm.addr + a2 - a1;
+
+        // rel32
+        if (dinst.size == 5 || dinst.size == 6) {
+            char instr[6] = { 0 };
+            instr[0]= instrucs[cn];
+            instr[1]= instrucs[cn + 1];
+            *(DWORD*)&instr[dinst.size - 4] = dest;
+            new_instrucs.insert(new_instrucs.end(), instr, instr + dinst.size);
+            continue;
+        }
+
+        // 2bytes  jcc rel8 / jmp rel8
+        if (dinst.opcode == I_JMP) {
+            dest -= 3;
+            new_instrucs.push_back(0xE9);
+        } else {
+            dest -= 4;
+            new_instrucs.push_back(0x0F);
+            new_instrucs.push_back((uint8_t)instrucs[cn] + 0x10);
+        }
+        char instr[4] = { 0 };
+        *(DWORD*)&instr[1] = dest;
+        new_instrucs.insert(new_instrucs.end(), instr, instr + 4);
+    }
+
+    return new_instrucs;
+}
+
 
 class WinHookHandle : public HookHandle {
 private:
@@ -124,13 +190,15 @@ hook_t WinProcessNative::hook(addr_t original, addr_t hook) {
 
     auto detourLen = GetDetourLen(originalBytes.data(), minDetourLen);
 
-    auto trampoline = this->malloc(detourLen + minDetourLen, 1, PAGE_EXECUTE_READWRITE);
+    auto trampoline = this->malloc((detourLen + minDetourLen) * 3, 1, PAGE_EXECUTE_READWRITE);
     if (!trampoline)
         return nullptr;
     bool clean_trampoline = false;
     defer([&]() { if (clean_trampoline) this->free(trampoline); });
 
-    vector<char> trampoline_data(originalBytes.begin(), originalBytes.begin() + detourLen);
+    vector<char> detour_data(originalBytes.begin(), originalBytes.begin() + detourLen);
+    auto trampoline_data = RedirectRelativeJmp(reinterpret_cast<void*>(original), trampoline, detour_data);
+
     auto trampoline_detour = reinterpret_cast<addr_t>(trampoline) + detourLen;
     auto detourx = WriteJumper(reinterpret_cast<void*>(trampoline_detour),
                                reinterpret_cast<void*>(original + detourLen), false);
@@ -142,13 +210,12 @@ hook_t WinProcessNative::hook(addr_t original, addr_t hook) {
     }
 
     auto detouro = WriteJumper(reinterpret_cast<void*>(original), reinterpret_cast<void*>(hook), false);
-    auto original_detour = vector<char>(originalBytes.begin(), originalBytes.begin() + detourLen);
     if (!this->write(original, detouro)) {
         clean_trampoline = true;
         return nullptr;
     }
 
-    return make_unique<WinHookHandle>(reinterpret_cast<void*>(original), trampoline, original_detour);
+    return make_unique<WinHookHandle>(reinterpret_cast<void*>(original), trampoline, detour_data);
 }
 
 bool  WinProcessNative::unhook(hook_t hook) {

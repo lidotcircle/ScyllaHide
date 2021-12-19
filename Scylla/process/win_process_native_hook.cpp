@@ -124,8 +124,8 @@ static vector<char> RedirectRelativeJmp(void* old_addr, void* new_addr, const ve
 
         // rel8 and target in this block
         if (dinst.size == 2) {
-            int dest = dinst.imm.addr + cn + 2;
-            if (dest >= 0 && dest < instrucs.size()) {
+            auto dest = dinst.imm.addr + cn + 2;
+            if (dest >= 0 && dest < (decltype(dest))instrucs.size()) {
                 new_instrucs.insert(new_instrucs.end(), instrucs.begin() + cn, instrucs.begin() + cn + dinst.size);
                 continue;
             }
@@ -133,7 +133,7 @@ static vector<char> RedirectRelativeJmp(void* old_addr, void* new_addr, const ve
 
         auto a1 = reinterpret_cast<uintptr_t>(new_addr) + new_instrucs.size();
         auto a2 = reinterpret_cast<uintptr_t>(old_addr) + cn;
-        DWORD dest = dinst.imm.addr + a2 - a1;
+        DWORD dest = (DWORD)dinst.imm.addr + a2 - a1;
 
         // rel32
         if (dinst.size == 5 || dinst.size == 6) {
@@ -148,10 +148,10 @@ static vector<char> RedirectRelativeJmp(void* old_addr, void* new_addr, const ve
         // 2bytes  jcc rel8 / jmp rel8
         if (dinst.opcode == I_JMP) {
             dest -= 3;
-            new_instrucs.push_back(0xE9);
+            new_instrucs.push_back((unsigned char)0xE9);
         } else {
             dest -= 4;
-            new_instrucs.push_back(0x0F);
+            new_instrucs.push_back((unsigned char)0x0F);
             new_instrucs.push_back((uint8_t)instrucs[cn] + 0x10);
         }
         char instr[4] = { 0 };

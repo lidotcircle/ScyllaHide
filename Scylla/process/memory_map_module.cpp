@@ -1,12 +1,17 @@
 #include "process/memory_map_module.h"
 #include "process/memory_map_section.h"
+#include "pe_header.h"
 #include <algorithm>
+#include <map>
+#include <string>
 #include <stdexcept>
 using namespace std;
 
 
-MemoryMapModule::MemoryMapModule(const std::string& mod_name, std::vector<std::shared_ptr<MemoryMap>> _pages):
-    mod_name(mod_name), pages(std::move(_pages))
+using addr_t = typename MemoryMapModule::addr_t;
+
+MemoryMapModule::MemoryMapModule(const std::string& mod_name, PEHeader header, std::vector<std::shared_ptr<MemoryMap>> _pages):
+    MapPEModule(mod_name), pages(std::move(_pages))
 {
     if (this->pages.empty())
         throw std::runtime_error("MemoryMapModule: no pages");
@@ -24,6 +29,8 @@ MemoryMapModule::MemoryMapModule(const std::string& mod_name, std::vector<std::s
 
     this->base_addr = this->pages.front()->baseaddr();
     this->mod_size = this->pages.back()->baseaddr() + this->pages.back()->size() - this->base_addr;
+
+    this->parse_header(header);
 }
 
 MemoryMapModule::addr_t MemoryMapModule::baseaddr() const {
@@ -60,10 +67,9 @@ void MemoryMapModule::set_at(addr_t index, char value) {
     (*page)->set_at(index - (*page)->baseaddr(), value);
 }
 
-const std::string& MemoryMapModule::module_name() const {
-    return this->mod_name;
+MemoryMapModule::SectionMapType& MemoryMapModule::get_sections() {
+    return this->sections;
 }
-
 const MemoryMapModule::SectionMapType& MemoryMapModule::get_sections() const {
     return this->sections;
 }

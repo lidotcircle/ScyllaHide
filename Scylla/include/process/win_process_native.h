@@ -60,6 +60,8 @@ public:
     inline bool write(void* addr, std::vector<char> data) {return this->write(reinterpret_cast<MemoryMap::addr_t>(addr), data);}
     inline std::vector<char> read(void* addr, size_t size) {return this->read (reinterpret_cast<MemoryMap::addr_t>(addr), size);}
 
+    size_t page_size() const;
+
     bool isWow64Process() const;
     HANDLE rawhandle();
     void reopen(DWORD add_desiredAcess);

@@ -1,6 +1,5 @@
 #include "RemoteHook.h"
 #include "process/win_process_native.h"
-#include "process/memory_map_module.h"
 #include "process/memory_map_win_page.h"
 #include <memory>
 #include <stdexcept>

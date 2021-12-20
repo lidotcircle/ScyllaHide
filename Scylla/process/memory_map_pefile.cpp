@@ -13,13 +13,16 @@ MemoryMapPEFile::MemoryMapPEFile(const vector<char>& buf) {
 }
 
 MemoryMapPEFile::MemoryMapPEFile(const string& filename) {
-    ifstream file(filename, ios::binary);
+    ifstream file(filename, ios::binary | ios::ate);
 
     if (!file.is_open())
         throw runtime_error("Failed to open file");
 
-    istream_iterator<char> begin(file), end;
-    vector<char> buf(begin, end);
+    size_t size = file.tellg();
+    file.seekg(0, ios::beg);
+    vector<char> buf(size);
+    file.read(buf.data(), size);
+
     this->parse_data(buf);
 }
 

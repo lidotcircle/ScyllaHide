@@ -5,20 +5,23 @@ using namespace peparse;
 
 PEHeader::PEHeader(const vector<char>& data)
 {
-    if (!this->parse_header(data)) {
-        throw runtime_error("Failed to parse PE header");
-    }
+    this->_parse_header_throw(data);
+}
+
+void PEHeader::_parse_header_throw(const vector<char>& data)
+{
+    this->header_size = data.size();
+    this->parse_dos_header(data);
+    auto off = this->parse_nt_header_32(data);
+    this->parse_section_headers(data, off);
 }
 
 bool PEHeader::parse_header(const vector<char>& data)
 {
     try {
-        this->header_size = data.size();
-        this->parse_dos_header(data);
-        auto off = this->parse_nt_header_32(data);
-        this->parse_section_headers(data, off);
+        this->_parse_header_throw(data);
         return true;
-    } catch (const exception&) {
+    } catch (const runtime_error&) {
         return false;
     }
 }
@@ -43,7 +46,7 @@ size_t PEHeader::parse_nt_header_32(const vector<char>& data)
 
     this->nthdr.nt_signature = *reinterpret_cast<const uint32_t*>(data.data() + offset);
     if (this->nthdr.nt_signature != NT_MAGIC)
-        throw runtime_error("nt header magic is not correct");
+        throw runtime_error("nt header magic is not correct at offset " + to_string(offset));
     offset += sizeof(uint32_t);
 
     this->nthdr.file_hdr = *reinterpret_cast<const file_header*>(data.data() + offset);

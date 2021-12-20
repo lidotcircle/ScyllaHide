@@ -12,6 +12,7 @@ private:
     size_t parse_nt_header_32(const std::vector<char>& data);
     void   parse_section_headers(const std::vector<char>& data, size_t offset);
     const peparse::data_directory* __data_directory() const;
+    void _parse_header_throw(const std::vector<char>& data);
 
 public:
     peparse::dos_header dos;

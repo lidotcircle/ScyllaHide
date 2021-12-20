@@ -17,8 +17,57 @@ ImportEntry::ImportEntry(const string& name)
     m_name.is_ordinal = false;
     m_name.name = new string(name);
 }
+ImportEntry::~ImportEntry() {
+    if (!m_name.is_ordinal) {
+        delete m_name.name;
+    }
+}
 
-bool ImportEntry::operator<(const ImportEntry& other)
+ImportEntry::ImportEntry(ImportEntry&& other)
+{
+    if (other.is_ordinal()) {
+        m_ordinal = other.m_ordinal;
+    } else {
+        m_name = other.m_name;
+        other.m_name.name = new string();
+    }
+}
+ImportEntry::ImportEntry(const ImportEntry& other)
+{
+    if (other.is_ordinal()) {
+        m_ordinal = other.m_ordinal;
+    } else {
+        m_name = other.m_name;
+        m_name.name = new string(*m_name.name);
+    }
+}
+
+ImportEntry& ImportEntry::operator=(const ImportEntry& other)
+{
+    this->~ImportEntry();
+
+    if (other.is_ordinal()) {
+        m_ordinal = other.m_ordinal;
+    } else {
+        m_name = other.m_name;
+        m_name.name = new string(*m_name.name);
+    }
+    return *this;
+}
+ImportEntry& ImportEntry::operator=(ImportEntry&& other)
+{
+    this->~ImportEntry();
+
+    if (other.is_ordinal()) {
+        m_ordinal = other.m_ordinal;
+    } else {
+        m_name = other.m_name;
+        other.m_name.name = new string();
+    }
+    return *this;
+}
+
+bool ImportEntry::operator<(const ImportEntry& other) const
 {
     if (m_ordinal.is_ordinal) {
         if (other.m_ordinal.is_ordinal) {
@@ -35,7 +84,7 @@ bool ImportEntry::operator<(const ImportEntry& other)
     }
 }
 
-bool ImportEntry::operator==(const ImportEntry& other)
+bool ImportEntry::operator==(const ImportEntry& other) const
 {
     if (m_ordinal.is_ordinal) {
         if (other.m_ordinal.is_ordinal) {
@@ -52,30 +101,29 @@ bool ImportEntry::operator==(const ImportEntry& other)
     }
 }
 
-ImportEntry::operator std::string() const {
+bool ImportEntry::operator!=(const ImportEntry& other) const
+{
+    return !(*this == other);
+}
+
+string ImportEntry::symbolname() const {
     if (m_ordinal.is_ordinal) {
-        throw std::runtime_error("ImportEntry::operator std::string(): not a name");
+        throw std::runtime_error("ImportEntry::symbolname(): not a name");
     } else {
         return *this->m_name.name;
     }
 }
 
-ImportEntry::operator uint16_t() const {
+uint16_t ImportEntry::ordinal() const {
     if (m_ordinal.is_ordinal) {
         return m_ordinal.ordinal;
     } else {
-        throw std::runtime_error("ImportEntry::operator uint16_t(): not an ordinal");
+        throw std::runtime_error("ImportEntry::ordinal(): not an ordinal");
     }
 }
 
 bool ImportEntry::is_ordinal() const {
     return m_ordinal.is_ordinal;
-}
-
-ImportEntry::~ImportEntry() {
-    if (!m_name.is_ordinal) {
-        delete m_name.name;
-    }
 }
 
 MapPEModule::MapPEModule(): m_parsed(false) {}
@@ -197,7 +245,7 @@ const map<uint32_t,pair<string,addr_t>>& MapPEModule::exports() const {
             continue;
         }
 
-        ret[ord].first = name;
+        ret[ord + exp_table.OrdinalBase].first = name;
     }
 
     auto _this = const_cast<MapPEModule*>(this);
@@ -229,7 +277,7 @@ const map<string,map<ImportEntry,addr_t>>& MapPEModule::imports() const {
 
     if (this->m_imports)
         return *this->m_imports;
-    
+
     map<string,map<ImportEntry,addr_t>> result;
     auto imp_dir = this->m_header.directory_import();
     if (imp_dir.VirtualAddress == 0) {
@@ -251,13 +299,13 @@ const map<string,map<ImportEntry,addr_t>>& MapPEModule::imports() const {
             uint64_t tbl = 0;
             bool is_ordinal = false;
             if (this->header().is_64bit()) {
-                tbl = this->get_u64(imp_entry.LookupTableRVA);
+                tbl = this->get_u64(rva);
                 if (tbl >> 63) {
                     is_ordinal = true;
                     tbl &= 0x7FFFFFFFFFFFFFFF;
                 }
             } else {
-                tbl = this->get_u32(imp_entry.LookupTableRVA);
+                tbl = this->get_u32(rva);
                 if (tbl >> 31) {
                     is_ordinal = true;
                     tbl &= 0x7FFFFFFF;
@@ -272,6 +320,7 @@ const map<string,map<ImportEntry,addr_t>>& MapPEModule::imports() const {
                 imports.insert(make_pair(ImportEntry(ord), addr_rva));
             } else {
                 uint32_t namerva = tbl & 0x7FFFFFFF;
+                namerva += 2; // skip hint
                 string iname;
                 for (;;namerva += 1) {
                     char c = this->get_at(namerva);

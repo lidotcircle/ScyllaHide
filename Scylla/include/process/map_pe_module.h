@@ -21,14 +21,22 @@ private:
     } m_name;
 
 public:
+    ImportEntry() = delete;
+    ImportEntry(const ImportEntry&);
+    ImportEntry(ImportEntry&&);
     ImportEntry(uint16_t ordinal);
     ImportEntry(const std::string& name);
 
-    bool operator<(const ImportEntry& other);
-    bool operator==(const ImportEntry& other);
+    ImportEntry& operator=(const ImportEntry&);
+    ImportEntry& operator=(ImportEntry&&);
 
-    operator std::string() const;
-    operator uint16_t() const;
+    bool operator< (const ImportEntry& other) const;
+    bool operator==(const ImportEntry& other) const;
+    bool operator!=(const ImportEntry& other) const;
+
+    std::string symbolname() const;
+    uint16_t ordinal() const;
+
     bool is_ordinal() const;
 
     ~ImportEntry();

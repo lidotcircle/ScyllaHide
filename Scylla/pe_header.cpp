@@ -72,8 +72,31 @@ uint32_t PEHeader::entrypointRVA() const {
     }
 }
 
+uint64_t PEHeader::imageBase() const {
+    if (this->is_64bit())
+        return this->nthdr.optional_hdr.optional_hdr64.ImageBase;
+    else
+        return this->nthdr.optional_hdr.optional_hdr32.ImageBase;
+}
+
 bool PEHeader::is_64bit() const {
     return this->nthdr.optional_hdr.optional_hdr32.Magic != NT_OPTIONAL_32_MAGIC;
+}
+
+uint16_t PEHeader::machine() const {
+    return this->nthdr.file_hdr.Machine;
+}
+
+uint16_t PEHeader::characteristics() const {
+    return this->nthdr.file_hdr.Characteristics;
+}
+
+bool PEHeader::relocatable() const {
+    return (this->characteristics() & IMAGE_FILE_RELOCS_STRIPPED) == 0;
+}
+
+bool PEHeader::is_exe() const {
+    return (this->characteristics() & IMAGE_FILE_DLL) == 0;
 }
 
 const data_directory* PEHeader::__data_directory() const {

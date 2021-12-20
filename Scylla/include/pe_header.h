@@ -26,7 +26,12 @@ public:
     std::vector<peparse::image_section_header> section_hdrs;
 
     uint32_t entrypointRVA() const;
+    uint64_t imageBase() const;
     bool is_64bit() const;
+    uint16_t characteristics() const;
+    uint16_t machine() const;
+    bool relocatable() const;
+    bool is_exe() const;
     std::vector<peparse::data_directory> data_directories() const;
 
     peparse::data_directory directory_export() const;

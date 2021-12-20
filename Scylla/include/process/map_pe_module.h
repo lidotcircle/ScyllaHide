@@ -8,6 +8,31 @@
 #include <memory>
 #include <map>
 
+union ImportEntry {
+private:
+    struct {
+        bool is_ordinal;
+        uint16_t ordinal;
+    } m_ordinal;
+
+    struct {
+        bool is_ordinal;
+        std::string* name;
+    } m_name;
+
+public:
+    ImportEntry(uint16_t ordinal);
+    ImportEntry(const std::string& name);
+
+    bool operator<(const ImportEntry& other);
+    bool operator==(const ImportEntry& other);
+
+    operator std::string() const;
+    operator uint16_t() const;
+    bool is_ordinal() const;
+
+    ~ImportEntry();
+};
 
 class MapPEModule : public virtual MemoryMap
 {
@@ -17,12 +42,13 @@ public:
 private:
     std::string mod_name;
     PEHeader m_header;
-    std::shared_ptr<std::map<std::string,addr_t>> m_exports;
-    std::shared_ptr<std::map<std::string,std::map<std::string,addr_t>>> m_imports;
+    std::shared_ptr<std::map<uint32_t,std::pair<std::string,addr_t>>> m_exports;
+    std::shared_ptr<std::map<std::string,std::map<ImportEntry,addr_t>>> m_imports;
     bool m_parsed;
 
 protected:
     void parse_header(PEHeader header);
+    virtual void change_base(addr_t new_base);
 
 public:
     MapPEModule();
@@ -34,10 +60,14 @@ public:
     const std::string& module_name()  const;
 
     const PEHeader& header() const;
-    const std::map<std::string,addr_t>&                       exports() const;
-    const std::map<std::string,std::map<std::string,addr_t>>& imports() const;
+
+    const std::map<uint32_t,std::pair<std::string,addr_t>>&   exports() const;
+    addr_t resolve_export(const std::string& name) const;
+    addr_t resolve_export(uint32_t ordinal) const;
+    const std::map<std::string,std::map<ImportEntry,addr_t>>& imports() const;
+
+    bool relocatable() const;
+    void base_relocate(addr_t base);
 };
-
-
 
 #endif // _MAP_PE_MODULE_H_

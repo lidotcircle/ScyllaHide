@@ -1,3 +1,4 @@
+#include "process/memory_map_pefile.h"
 #include <Windows.h>
 #include <Shlwapi.h>
 #include <TlHelp32.h>
@@ -12,13 +13,13 @@
 #include <set>
 #include <iostream>
 #include <cxxopts.hpp>
-using namespace std;
 
 #include "LogServer.h"
 #include "DynamicMapping.h"
 #include "ApplyHooking.h"
 #include "../HookLibrary/HookMain.h"
 #include "../PluginGeneric/Injector.h"
+using namespace std;
 
 
 scl::Settings g_settings;
@@ -117,8 +118,49 @@ static set<string> requireDll = {
     "user32.dll",
 };
 
+static void test_mmm(const char* path) {
+    try {
+        MemoryMapPEFile mmm(path);
+        for (auto& sec: mmm.sections())
+        {
+            cout << sec << endl;
+        }
+
+        auto& exports = mmm.exports();
+        for (auto& exp: exports)
+        {
+            cout << exp.first << " " << exp.second.first << " " << std::hex << exp.second.second << endl;
+        }
+
+        auto& imports = mmm.imports();
+        for (auto& dll: imports) {
+            cout << dll.first << endl;
+            for (auto& f: dll.second) {
+                cout << "\t";
+                if (f.first.is_ordinal()) {
+                    cout << f.first.ordinal() << " " << f.second << endl;
+                } else {
+                    cout << f.first.symbolname() << " " << f.second << endl;
+                }
+            }
+        }
+
+        cout << "ImageBase: 0x" << std::hex << mmm.baseaddr() << endl;
+        mmm.base_relocate(0x1000);
+        cout << "ImageBase: 0x" << std::hex << mmm.baseaddr() << endl;
+
+    } catch(exception& e) {
+        cout << e.what() << endl;
+    }
+}
+
 int main(int argc, char* argv[])
 {
+    if (argc == 2) {
+        test_mmm(argv[1]);
+        return 0;
+    }
+
     DWORD targetPid = 0;
     char * dllPath = 0;
     LogServer srv(0);

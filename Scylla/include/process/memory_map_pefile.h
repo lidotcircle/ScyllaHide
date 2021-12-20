@@ -24,6 +24,8 @@ public:
     virtual addr_t baseaddr() const override;
     virtual size_t size() const override;
 
+    const char* data_ptr() const;
+
     ~MemoryMapPEFile();
 };
 

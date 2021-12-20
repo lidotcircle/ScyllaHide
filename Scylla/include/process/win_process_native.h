@@ -12,7 +12,7 @@
 typedef int HANDLE;
 #endif // defined(_WIN32) || defined(_WIN64)
 
-class MemoryMapModule;
+class MapPEModule;
 class PagePool;
 class HookHandle {
 public:
@@ -24,7 +24,7 @@ class WinProcessNative : public MemoryMapCollection
 {
 public:
     using ProcessHandle = std::shared_ptr<HANDLE>;
-    using ModuleMapType = std::map<std::string,std::shared_ptr<MemoryMapModule>>;
+    using ModuleMapType = std::map<std::string,std::shared_ptr<MapPEModule>>;
     using addr_t  = typename MemoryMap::addr_t;
     using hook_t  = std::unique_ptr<HookHandle>;
 
@@ -34,9 +34,13 @@ private:
     std::vector<std::shared_ptr<MemoryMap>> process_maps;
     ModuleMapType modules;
     std::map<DWORD,std::shared_ptr<PagePool>> allocated_pages;
+    std::map<addr_t,std::pair<std::string,size_t>> stealthy_modules;
 
     void refresh_process();
     void add_nomodule_pages();
+
+    void inject_dll_stealthy   (const std::string& dll_path);
+    void inject_dll_loadlibrary(const std::string& dll_path);
 
 public:
     WinProcessNative(int pid);
@@ -63,12 +67,15 @@ public:
     size_t page_size() const;
 
     bool isWow64Process() const;
+    bool is_64bit() const;
     HANDLE rawhandle();
     void reopen(DWORD add_desiredAcess);
 
     hook_t hook(addr_t original, addr_t hook);
     bool   unhook(hook_t hook);
     inline hook_t hook(void* original, void* hook) {return this->hook(reinterpret_cast<addr_t>(original), reinterpret_cast<addr_t>(hook));}
+
+    void inject_dll(const std::string& dll_path, bool stealthy);
 
     void refresh();
 };

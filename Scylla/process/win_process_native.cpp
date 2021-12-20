@@ -4,6 +4,7 @@
 #include "process/memory_map_win_page.h"
 #include "process/memory_map_module.h"
 #include "process/memory_map_section.h"
+#include "process/memory_map_stealthy_module.h"
 #include <stdexcept>
 #include <Windows.h>
 #include <psapi.h>
@@ -203,13 +204,12 @@ void WinProcessNative::refresh_process()
 
     this->add_nomodule_pages();
 
+    auto less_func = [](std::shared_ptr<MemoryMap> &a, const void *base) {
+        return reinterpret_cast<void *>(a->baseaddr()) < base;
+    };
     vector<shared_ptr<MemoryMap>> module_maps;
     for (auto& module: modules) {
         vector<shared_ptr<MemoryMap>> maps;
-
-        auto less_func = [](std::shared_ptr<MemoryMap> &a, const void *base) {
-            return reinterpret_cast<void *>(a->baseaddr()) < base;
-        };
        auto module_page = std::lower_bound(
             this->process_maps.begin(), this->process_maps.end(), get<0>(module),
             less_func);
@@ -262,6 +262,21 @@ void WinProcessNative::refresh_process()
             this->process_maps.begin(), this->process_maps.end(), module_end,
             less_func);
         this->process_maps.erase(module_page_beg, module_page_end);
+    }
+    for (auto smodule: this->stealthy_modules) {
+        auto ml = std::lower_bound(
+            this->process_maps.begin(), this->process_maps.end(),
+            reinterpret_cast<void*>(smodule.first), less_func
+        );
+        auto mu = std::lower_bound(
+            this->process_maps.begin(), this->process_maps.end(),
+            reinterpret_cast<void*>(smodule.first + smodule.second.second), less_func
+        );
+        auto base = reinterpret_cast<void*>(smodule.first);
+        auto mpage = make_shared<MemoryMapWinPage>(this->process_handle, base, smodule.second.second, false);
+        auto mmodule = make_shared<MemoryMapStealthyModule>(mpage, smodule.second.first);
+        this->process_maps.erase(ml, mu);
+        module_maps.push_back(mmodule);
     }
 
     for (auto& module_map: module_maps) {
@@ -401,6 +416,14 @@ bool WinProcessNative::isWow64Process() const {
 
 HANDLE WinProcessNative::rawhandle() {
     return *this->process_handle.get();
+}
+
+bool WinProcessNative::is_64bit() const {
+#ifndef _WIN64
+    return false;
+#else
+    return true;
+#endif
 }
 
 #endif // _WIN32 || _WIN64

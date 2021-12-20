@@ -80,5 +80,9 @@ size_t MemoryMapPEFile::size() const {
     return this->data.size();
 }
 
+const char* MemoryMapPEFile::data_ptr() const {
+    return this->data.data();
+}
+
 MemoryMapPEFile::~MemoryMapPEFile() {
 }

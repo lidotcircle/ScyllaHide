@@ -98,8 +98,6 @@ static int GetDetourLen(const void * lpStart, const int minSize)
 }
 
 static vector<char> RedirectRelativeJmp(void* old_addr, void* new_addr, const vector<char>& instrucs) {
-    instrucs.data();
-
     _CodeInfo decomposerCi = { 0 };
     decomposerCi.code = (const uint8_t*)instrucs.data();
     decomposerCi.codeLen = instrucs.size();

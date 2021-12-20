@@ -110,6 +110,37 @@ vector<data_directory> PEHeader::data_directories() const {
     return vector<data_directory>(dr, dr + DIR_RESERVED);
 }
 
+size_t PEHeader::sizeOfHeaders() const {
+    if (this->is_64bit())
+        return this->nthdr.optional_hdr.optional_hdr64.SizeOfHeaders;
+    else
+        return this->nthdr.optional_hdr.optional_hdr32.SizeOfHeaders;
+}
+size_t PEHeader::sizeOfImage() const {
+    if (this->is_64bit())
+        return this->nthdr.optional_hdr.optional_hdr64.SizeOfImage;
+    else
+        return this->nthdr.optional_hdr.optional_hdr32.SizeOfImage;
+}
+size_t PEHeader::sizeofCode() const {
+    if (this->is_64bit())
+        return this->nthdr.optional_hdr.optional_hdr64.SizeOfCode;
+    else
+        return this->nthdr.optional_hdr.optional_hdr32.SizeOfCode;
+}
+size_t PEHeader::sizeOfInitializedData() const {
+    if (this->is_64bit())
+        return this->nthdr.optional_hdr.optional_hdr64.SizeOfInitializedData;
+    else
+        return this->nthdr.optional_hdr.optional_hdr32.SizeOfInitializedData;
+}
+size_t PEHeader::sizeOfUninitializedData() const {
+    if (this->is_64bit())
+        return this->nthdr.optional_hdr.optional_hdr64.SizeOfUninitializedData;
+    else
+        return this->nthdr.optional_hdr.optional_hdr32.SizeOfUninitializedData;
+}
+
 data_directory PEHeader::directory_export() const { return this->__data_directory()[DIR_EXPORT]; }
 data_directory PEHeader::directory_import() const { return this->__data_directory()[DIR_IMPORT]; }
 data_directory PEHeader::directory_resource() const { return this->__data_directory()[DIR_RESOURCE]; }

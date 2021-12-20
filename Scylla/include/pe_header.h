@@ -34,6 +34,12 @@ public:
     bool is_exe() const;
     std::vector<peparse::data_directory> data_directories() const;
 
+    size_t sizeOfHeaders() const;
+    size_t sizeOfImage() const;
+    size_t sizeofCode() const;
+    size_t sizeOfInitializedData() const;
+    size_t sizeOfUninitializedData() const;
+
     peparse::data_directory directory_export() const;
     peparse::data_directory directory_import() const;
     peparse::data_directory directory_resource() const;

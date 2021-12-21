@@ -26,8 +26,8 @@ static int strcmp_nocase(const char* a, const char* b) {
 
 void* ExchangeData::lookup_trampoline(void* hook) {
     for(size_t i=0;i<m_numOfEntries;i++) {
-        if(m_entries[i].hook == hook) {
-            return m_entries[i].trampoline;
+        if(m_entries[i]->hook == hook) {
+            return m_entries[i]->trampoline;
         }
     }
 
@@ -36,8 +36,8 @@ void* ExchangeData::lookup_trampoline(void* hook) {
 
 void* ExchangeData::lookup_trampoline(const char* funcname) {
     for(size_t i=0;i<m_numOfEntries;i++) {
-        if(strcmp_nocase(m_entries[i].funcname, funcname) == 0) {
-            return m_entries[i].trampoline;
+        if(strcmp_nocase(m_entries[i]->funcname, funcname) == 0) {
+            return m_entries[i]->trampoline;
         }
     }
 
@@ -46,10 +46,20 @@ void* ExchangeData::lookup_trampoline(const char* funcname) {
 
 void* ExchangeData::lookup_trampoline(const char* dllname, const char* funcname) {
     for(size_t i=0;i<m_numOfEntries;i++) {
-        if(strcmp_nocase(m_entries[i].dllname, dllname) == 0 &&
-           strcmp_nocase(m_entries[i].funcname, funcname) == 0)
+        if(strcmp_nocase(m_entries[i]->dllname, dllname) == 0 &&
+           strcmp_nocase(m_entries[i]->funcname, funcname) == 0)
         {
-            return m_entries[i].trampoline;
+            return m_entries[i]->trampoline;
+        }
+    }
+
+    return nullptr;
+}
+
+const char* ExchangeData::lookup_key(const char* key) {
+    for(size_t i=0;i<m_numOfKV;i++) {
+        if(strcmp_nocase(m_key_value_str[i]->key, key) == 0) {
+            return m_key_value_str[i]->value;
         }
     }
 

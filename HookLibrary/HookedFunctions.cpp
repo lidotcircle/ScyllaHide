@@ -1197,10 +1197,12 @@ NTSTATUS NTAPI HookedNtWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddres
 {
 #pragma comment(linker, "/EXPORT:" __FUNCTION__ "=" __FUNCDNAME__)
     auto client = logClient();
+    auto val = exchange_data.lookup_key("key");
+    auto v2 = exchange_data.lookup_trampoline("LoadLibraryA");
     client->sendfmt("NtWriteVirtualMemory(ProcessHandle = %d, BaseAddress = 0x%08x, \n"
-                    "                     Buffer = ..., BufferSize = 0x%04x, PNumberOfBytesWritten = 0x%08x)",
+                    "                     Buffer = ..., BufferSize = 0x%04x, PNumberOfBytesWritten = 0x%08x)%lx %lx %lx %s",
         ProcessHandle, BaseAddress,
-        BufferSize, NumberofBytesWritten);
+        BufferSize, NumberofBytesWritten, val, v2, &exchange_data, val);
 
     return HookDllData.dNtWriteVirtualMemory(ProcessHandle, BaseAddress, Buffer, BufferSize, NumberofBytesWritten);
 }

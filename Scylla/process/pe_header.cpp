@@ -1,4 +1,4 @@
-#include "pe_header.h"
+#include "process/pe_header.h"
 #include <stdexcept>
 using namespace std;
 using namespace peparse;

@@ -1,6 +1,6 @@
 #include "process/memory_map_module.h"
 #include "process/memory_map_section.h"
-#include "pe_header.h"
+#include "process/pe_header.h"
 #include <algorithm>
 #include <map>
 #include <string>

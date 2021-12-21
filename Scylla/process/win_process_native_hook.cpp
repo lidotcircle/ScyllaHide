@@ -1,4 +1,4 @@
-#include "pe_header.h"
+#include "process/pe_header.h"
 #include "process/win_process_native.h"
 #include "process/memory_map_win_page.h"
 #include "process/memory_map_module.h"

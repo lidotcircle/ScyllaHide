@@ -1,8 +1,8 @@
 #ifndef _MEMORY_MAP_MODULE_H_
 #define _MEMORY_MAP_MODULE_H_
 
+#include "./pe_header.h"
 #include "map_pe_module.h"
-#include "pe_header.h"
 #include <algorithm>
 #include <vector>
 #include <memory>

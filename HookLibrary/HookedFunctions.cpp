@@ -7,8 +7,10 @@
 #include "HookedFunctions.h"
 #include "HookHelper.h"
 #include "Tls.h"
+#include "scylla/exchange.h"
 
-extern "C" DLLExport HOOK_DLL_DATA HookDllData = { 0 };
+extern "C" DLLExport HOOK_DLL_DATA HookDllData  =  { 0 };
+extern "C" DLLExport ExchangeData exchange_data =  { 0 };
 
 void FakeCurrentParentProcessId(PSYSTEM_PROCESS_INFORMATION pInfo);
 void FakeCurrentOtherOperationCount(PSYSTEM_PROCESS_INFORMATION pInfo);

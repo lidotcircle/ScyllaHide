@@ -285,7 +285,8 @@ bool StartHooking(Process_t process, HOOK_DLL_DATA *hdd, BYTE * dllMemory, DWORD
     if (dllMemory == nullptr || imageBase == 0)
         return peb_flags != 0; // Not injecting hook DLL
 
-    return ApplyHook(hdd, process, dllMemory, imageBase);
+    // return ApplyHook(hdd, process, dllMemory, imageBase);
+    return true;
 }
 
 void startInjectionProcess(Process_t process, HOOK_DLL_DATA *hdd, BYTE * dllMemory, bool newProcess)

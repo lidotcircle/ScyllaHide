@@ -1,3 +1,4 @@
+#include "process/map_pe_module.h"
 #include <Scylla/Logger.h>
 #include <Scylla/OsInfo.h>
 #include <Scylla/PebHider.h>
@@ -79,9 +80,10 @@ t_NtWriteVirtualMemory _NtWriteVirtualMemory = 0;
 t_NtReadVirtualMemory _NtReadVirtualMemory = 0;
 t_NtOpenProcess _NtOpenProcess = 0;
 
-bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, Process_t process, BYTE * dllMemory, DWORD_PTR imageBase)
+bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, Process_t process, std::shared_ptr<MapPEModule> dllmodule)
 {
     hNtdll = GetModuleHandle("ntdll.dll");
+    auto imageBase = dllmodule->baseaddr();
 
 #ifndef _WIN64
     countNativeHooks = 0;
@@ -89,29 +91,29 @@ bool ApplyNtdllHook(HOOK_DLL_DATA * hdd, Process_t process, BYTE * dllMemory, DW
     HookNative = hdd->HookNative;
 #endif
 
-    void * HookedNtSetInformationThread = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtSetInformationThread") + imageBase);
-    void * HookedNtQuerySystemInformation = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtQuerySystemInformation") + imageBase);
-    void * HookedNtQueryInformationProcess = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtQueryInformationProcess") + imageBase);
-    void * HookedNtSetInformationProcess = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtSetInformationProcess") + imageBase);
-    void * HookedNtQueryObject = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtQueryObject") + imageBase);
-    void * HookedNtYieldExecution = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtYieldExecution") + imageBase);
-    void * HookedNtGetContextThread = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtGetContextThread") + imageBase);
-    void * HookedNtSetContextThread = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtSetContextThread") + imageBase);
-    void * HookedKiUserExceptionDispatcher = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedKiUserExceptionDispatcher") + imageBase);
-    void * HookedNtContinue = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtContinue") + imageBase);
-    void * HookedNtClose = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtClose") + imageBase);
-    void * HookedNtDuplicateObject = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtDuplicateObject") + imageBase);
-    void * HookedNtSetDebugFilterState = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtSetDebugFilterState") + imageBase);
-    void * HookedNtCreateThread = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtCreateThread") + imageBase);
-    void * HookedNtCreateThreadEx = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtCreateThreadEx") + imageBase);
-    void * HookedNtQuerySystemTime = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtQuerySystemTime") + imageBase);
-    void * HookedNtQueryPerformanceCounter = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtQueryPerformanceCounter") + imageBase);
-    void * HookedNtResumeThread = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtResumeThread") + imageBase);
-    void * HookedNtWriteVirtualMemory = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtWriteVirtualMemory") + imageBase);
-    void * HookedNtReadVirtualMemory  = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtReadVirtualMemory") + imageBase);
-    void * HookedNtOpenProcess = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNtOpenProcess") + imageBase);
+    void * HookedNtSetInformationThread = (void *)(dllmodule->resolve_export("HookedNtSetInformationThread") + imageBase);
+    void * HookedNtQuerySystemInformation = (void *)(dllmodule->resolve_export("HookedNtQuerySystemInformation") + imageBase);
+    void * HookedNtQueryInformationProcess = (void *)(dllmodule->resolve_export("HookedNtQueryInformationProcess") + imageBase);
+    void * HookedNtSetInformationProcess = (void *)(dllmodule->resolve_export("HookedNtSetInformationProcess") + imageBase);
+    void * HookedNtQueryObject = (void *)(dllmodule->resolve_export("HookedNtQueryObject") + imageBase);
+    void * HookedNtYieldExecution = (void *)(dllmodule->resolve_export("HookedNtYieldExecution") + imageBase);
+    void * HookedNtGetContextThread = (void *)(dllmodule->resolve_export("HookedNtGetContextThread") + imageBase);
+    void * HookedNtSetContextThread = (void *)(dllmodule->resolve_export("HookedNtSetContextThread") + imageBase);
+    void * HookedKiUserExceptionDispatcher = (void *)(dllmodule->resolve_export("HookedKiUserExceptionDispatcher") + imageBase);
+    void * HookedNtContinue = (void *)(dllmodule->resolve_export("HookedNtContinue") + imageBase);
+    void * HookedNtClose = (void *)(dllmodule->resolve_export("HookedNtClose") + imageBase);
+    void * HookedNtDuplicateObject = (void *)(dllmodule->resolve_export("HookedNtDuplicateObject") + imageBase);
+    void * HookedNtSetDebugFilterState = (void *)(dllmodule->resolve_export("HookedNtSetDebugFilterState") + imageBase);
+    void * HookedNtCreateThread = (void *)(dllmodule->resolve_export("HookedNtCreateThread") + imageBase);
+    void * HookedNtCreateThreadEx = (void *)(dllmodule->resolve_export("HookedNtCreateThreadEx") + imageBase);
+    void * HookedNtQuerySystemTime = (void *)(dllmodule->resolve_export("HookedNtQuerySystemTime") + imageBase);
+    void * HookedNtQueryPerformanceCounter = (void *)(dllmodule->resolve_export("HookedNtQueryPerformanceCounter") + imageBase);
+    void * HookedNtResumeThread = (void *)(dllmodule->resolve_export("HookedNtResumeThread") + imageBase);
+    void * HookedNtWriteVirtualMemory = (void *)(dllmodule->resolve_export("HookedNtWriteVirtualMemory") + imageBase);
+    void * HookedNtReadVirtualMemory  = (void *)(dllmodule->resolve_export("HookedNtReadVirtualMemory") + imageBase);
+    void * HookedNtOpenProcess = (void *)(dllmodule->resolve_export("HookedNtOpenProcess") + imageBase);
 
-    HookedNativeCallInternal = (void *)(GetDllFunctionAddressRVA(dllMemory, "HookedNativeCallInternal") + imageBase);
+    HookedNativeCallInternal = (void *)(dllmodule->resolve_export("HookedNativeCallInternal") + imageBase);
 
     _NtSetInformationThread = (t_NtSetInformationThread)GetProcAddress(hNtdll, "NtSetInformationThread");
     _NtQuerySystemInformation = (t_NtQuerySystemInformation)GetProcAddress(hNtdll, "NtQuerySystemInformation");
@@ -829,14 +831,14 @@ void RestoreHooks(HOOK_DLL_DATA * hdd, Process_t process)
     hdd->hDllImage = 0;
 }
 
-bool ApplyHook(HOOK_DLL_DATA * hdd, Process_t process, BYTE * dllMemory, DWORD_PTR imageBase)
+bool ApplyHook(HOOK_DLL_DATA * hdd, Process_t process, std::shared_ptr<MapPEModule> dllmodule)
 {
     bool success = true;
-    hdd->hDllImage = (HMODULE)imageBase;
+    hdd->hDllImage = (HMODULE)dllmodule->baseaddr();
 
     if (true)
     {
-        success = success && ApplyNtdllHook(hdd, process, dllMemory, imageBase);
+        success = success && ApplyNtdllHook(hdd, process, dllmodule);
     }
     /*
     if (!hdd->isKernel32Hooked)

@@ -7,3 +7,6 @@
 [submodule "3rdparty/yaml-cpp"]
 	path = 3rdparty/yaml-cpp
 	url = https://github.com/jbeder/yaml-cpp
+[submodule "3rdparty/printf"]
+	path = 3rdparty/printf
+	url = https://github.com/mpaland/printf

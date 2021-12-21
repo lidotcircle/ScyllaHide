@@ -15,7 +15,7 @@
 #include <stdexcept>
 #include <cxxopts.hpp>
 
-#include "LogServer.h"
+#include "logger/udp_console_log_server.h"
 #include "DynamicMapping.h"
 #include "ApplyHooking.h"
 #include "../HookLibrary/HookMain.h"
@@ -167,8 +167,7 @@ int main(int argc, char* argv[])
 
     DWORD targetPid = 0;
     char * dllPath = 0;
-    LogServer srv(0);
-    srv.init();
+    UDPConsoleLogServer srv;
     udpPort = srv.GetPort();
     udpAddr = srv.GetAddr();
 

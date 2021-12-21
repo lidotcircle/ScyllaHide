@@ -280,6 +280,9 @@ int main(int argc, char* argv[])
     mx.set_udp_addr(udpAddr);
     mx.add_entry("kernel32.dll", "LoadLibraryA", (void*)LoadLibraryA, (void*)LoadLibraryA);
     mx.add_key_value("key", "value");
+    mx.add_key_value("vey", "vaue");
+    mx.add_key_value("aey", "vlue");
+    mx.add_key_value("ley", "alue");
     gmx = &mx;
 
     if (targetPid && dllPath)

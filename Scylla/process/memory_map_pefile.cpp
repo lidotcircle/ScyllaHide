@@ -32,7 +32,7 @@ void MemoryMapPEFile::parse_data(const vector<char>& buf) {
     if (header.sizeOfImage() < buf.size())
         throw runtime_error("invalid pe file, sizeOfImage is too small");
 
-    vector<char> image_data(header.sizeOfImage(), '0');
+    vector<char> image_data(header.sizeOfImage(), 0);
     this->base_address = (addr_t)header.imageBase();
 
     if (header.sizeOfHeaders() > buf.size())

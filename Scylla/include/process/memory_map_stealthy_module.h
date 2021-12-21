@@ -19,6 +19,7 @@ private:
 public:
     MemoryMapStealthyModule() = delete;
     MemoryMapStealthyModule(std::shared_ptr<MemoryMapWinPage> page, const std::string& modname);
+    MemoryMapStealthyModule(std::shared_ptr<MemoryMapWinPage> page, PEHeader header, const std::string& modname);
 
     virtual addr_t baseaddr() const override;
     virtual size_t size() const override;

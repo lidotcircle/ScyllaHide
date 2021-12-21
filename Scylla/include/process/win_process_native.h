@@ -32,10 +32,13 @@ private:
     int process_id;
     ProcessHandle process_handle;
     std::vector<std::shared_ptr<MemoryMap>> process_maps;
-    ModuleMapType modules;
     std::map<DWORD,std::shared_ptr<PagePool>> allocated_pages;
     std::map<addr_t,std::pair<std::string,size_t>> stealthy_modules;
+    ModuleMapType m_modules;
 
+    std::string canonicalize_module_name(const std::string& module_name);
+    void clear_modules();
+    void add_module(const std::string& module_name, std::shared_ptr<MapPEModule> module);
     void refresh_process();
     void add_nomodule_pages();
 
@@ -48,7 +51,9 @@ public:
     virtual size_t map_count() const override;
     virtual std::shared_ptr<MemoryMap> get_map(size_t index) override;
 
-    const ModuleMapType& get_modules() const;
+    std::vector<std::string> get_modules() const;
+    std::shared_ptr<MapPEModule>       find_module(const std::string& name);
+    const std::shared_ptr<MapPEModule> find_module(const std::string& name) const;
 
     void* malloc(size_t size, size_t alignment = 1, DWORD protect = PAGE_EXECUTE_READWRITE);
     void  free(void* ptr);

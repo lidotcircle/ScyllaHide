@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <stdexcept>
+#include <iostream>
 using namespace std;
 
 
@@ -22,16 +23,13 @@ void WinProcessNative::inject_dll_stealthy(const string& dll_path) {
     if (dll_map.header().is_64bit() != this->is_64bit())
         throw runtime_error("DLL is not compatible with process");
 
-    auto& modules = this->get_modules();
     auto& imports = dll_map.imports();
     for (auto& import : imports) {
         auto& dllname = import.first;
-        auto mod = modules.find(dllname);
-
-        if (mod == modules.end())
+        auto modmap = this->find_module(dllname);
+        if (!modmap)
             throw runtime_error("stealthy injection DLL not found: " + dllname);
 
-        auto modmap = mod->second;
         auto modbase = modmap->baseaddr();
         for (auto& func : import.second) {
             addr_t addr;
@@ -42,9 +40,9 @@ void WinProcessNative::inject_dll_stealthy(const string& dll_path) {
             }
 
             if (this->is_64bit()) {
-                this->set_u64(func.second, addr);
+                dll_map.set_u64(func.second, addr);
             } else {
-                this->set_u32(func.second, addr);
+                dll_map.set_u32(func.second, addr);
             }
         }
     }
@@ -57,12 +55,13 @@ void WinProcessNative::inject_dll_stealthy(const string& dll_path) {
         this->free(addr);
         throw runtime_error("failed to write DLL to process");
     }
+    cout << "address: " << hex << addr << " " << dll_map.size() << endl;
 
     this->stealthy_modules[dll_base] = make_pair(dll_path, dll_map.size());
     auto page = std::make_shared<MemoryMapWinPage>(this->process_handle, addr,
                                                    dll_map.size(), false);
-    auto modulen = std::make_shared<MemoryMapStealthyModule>(page, dll_path);
-    this->modules[dll_path] = modulen;
+    auto modulen = std::make_shared<MemoryMapStealthyModule>(page, dll_map.header(), dll_path);
+    this->add_module(dll_path, modulen);
     this->process_maps.push_back(modulen);
 
     std::sort(this->process_maps.begin(), this->process_maps.end(),

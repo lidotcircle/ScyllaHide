@@ -1,6 +1,16 @@
 #include "process/memory_map_collection.h"
 #include <stdexcept>
+#include <sstream>
+#include <iomanip>
 using namespace std;
+
+template<typename T>
+static string to_hex_string(T addr)
+{
+    stringstream ss;
+    ss << hex << addr;
+    return ss.str();
+}
 
 char MemoryMapCollection::get_at(addr_t addr) const {
     for (size_t i=0;i<this->map_count();i++) {
@@ -11,7 +21,7 @@ char MemoryMapCollection::get_at(addr_t addr) const {
         }
     }
 
-    throw runtime_error("Address not mapped");
+    throw runtime_error("MemoryMapCollection::get_at() Address not mapped: " + to_hex_string(addr));
 }
 
 const std::shared_ptr<MemoryMap> MemoryMapCollection::get_map(addr_t index) const {
@@ -28,7 +38,7 @@ void MemoryMapCollection::set_at(addr_t addr, char value) {
         }
     }
 
-    throw runtime_error("Address not mapped");
+    throw runtime_error("MemoryMapCollection::set_at() Address not mapped: " + to_hex_string(addr));
 }
 
 bool MemoryMapCollection::is_valid_addr(addr_t addr) {
@@ -45,7 +55,7 @@ bool MemoryMapCollection::is_valid_addr(addr_t addr) {
 
 MemoryValueRef MemoryMapCollection::operator[] (addr_t addr) {
     if (!this->is_valid_addr(addr))
-        throw runtime_error("Address not mapped");
+        throw runtime_error("MemoryMapCollection::operator[] Address not mapped: " + to_hex_string(addr));
 
     return MemoryValueRef(this, addr);
 }

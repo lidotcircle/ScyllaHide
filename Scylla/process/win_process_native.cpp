@@ -154,7 +154,7 @@ void WinProcessNative::refresh_process()
         this->reopen(0);
     auto ph = *this->process_handle;
     this->process_maps.clear();
-    this->modules.clear();
+    this->clear_modules();
     vector<tuple<void*,size_t,string>> modules;
 
 
@@ -282,7 +282,7 @@ void WinProcessNative::refresh_process()
     for (auto& module_map: module_maps) {
         auto mod = std::dynamic_pointer_cast<MemoryMapModule>(module_map);
         assert(mod && "this map should be module");
-        this->modules[mod->module_name()] = mod;
+        this->add_module(mod->module_name(), mod);
         this->process_maps.push_back(module_map);
     }
 
@@ -331,8 +331,46 @@ std::shared_ptr<MemoryMap> WinProcessNative::get_map(size_t index) {
     return this->process_maps[index];
 }
 
-const WinProcessNative::ModuleMapType& WinProcessNative::get_modules() const {
-    return this->modules;
+vector<string> WinProcessNative::get_modules() const {
+    vector<string> ans;
+    for (auto& module: this->m_modules) {
+        ans.push_back(module.first);
+    }
+    return ans;
+}
+
+static string __tolower(const string& str) {
+    string res;
+    for (auto c: str) res.push_back(tolower(c));
+    return res;
+}
+
+void WinProcessNative::add_module(const string& name, shared_ptr<MapPEModule> module) {
+    this->m_modules[this->canonicalize_module_name(name)] = module;
+}
+
+void WinProcessNative::clear_modules() {
+    this->m_modules.clear();
+}
+
+string WinProcessNative::canonicalize_module_name(const string& name) {
+    string lname = __tolower(name);
+    if (lname.find_last_of('\\') != string::npos)
+        lname = lname.substr(lname.find_last_of('\\') + 1);
+    return lname;
+}
+
+shared_ptr<MapPEModule> WinProcessNative::find_module(const string& name) {
+    auto cname = this->canonicalize_module_name(name);
+    auto it = this->m_modules.find(cname);
+    if (it == this->m_modules.end())
+        return nullptr;
+    return it->second;
+}
+
+const shared_ptr<MapPEModule> WinProcessNative::find_module(const string& name) const {
+    auto _this = const_cast<WinProcessNative*>(this);
+    return _this->find_module(name);
 }
 
 void WinProcessNative::refresh() {

@@ -1,9 +1,9 @@
-#include "PebHider.h"
 #include <vector>
-#include <Scylla/NtApiShim.h>
-#include <Scylla/Peb.h>
-#include <Scylla/OsInfo.h>
-#include <Scylla/Util.h>
+#include "scylla/PebHider.h"
+#include "scylla/NtApiShim.h"
+#include "scylla/Peb.h"
+#include "scylla/OsInfo.h"
+#include "scylla/Util.h"
 
 #define HEAP_VALIDATE_ALL_ENABLED       0x20000000
 #define HEAP_CAPTURE_STACK_BACKTRACES   0x08000000

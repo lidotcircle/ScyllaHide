@@ -1,7 +1,6 @@
-#include "Settings.h"
+#include "scylla/Settings.h"
+#include "scylla/Util.h"
 #include <algorithm>
-
-#include "Util.h"
 
 #define SCYLLA_HIDE_SETTINGS_SECTION                L"SETTINGS"
 #define SCYLLA_HIDE_SETTINGS_CURRENT_PROFILE_KEY    L"CurrentProfile"

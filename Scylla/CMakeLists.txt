@@ -1,0 +1,11 @@
+
+set(scylla_SOURCES "")
+file(GLOB_RECURSE scylla_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/lib/**.cpp)
+add_library(scylla STATIC ${scylla_SOURCES})
+target_include_directories(scylla PUBLIC ${CMAKE_CURRENT_LIST_DIR})
+target_include_directories(scylla PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
+target_link_libraries(scylla PUBLIC ntdll)
+target_link_libraries(scylla PUBLIC distorm3)
+target_link_libraries(scylla PUBLIC cxxopts)
+target_link_libraries(scylla PUBLIC pe-parser-static)
+target_link_libraries(scylla PUBLIC yaml-cpp::yaml-cpp)

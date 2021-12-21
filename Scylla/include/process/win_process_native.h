@@ -6,11 +6,7 @@
 #include <memory>
 #include <map>
 #include <type_traits>
-#if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
-#else
-typedef int HANDLE;
-#endif // defined(_WIN32) || defined(_WIN64)
 
 class MapPEModule;
 class PagePool;
@@ -84,5 +80,7 @@ public:
 
     void refresh();
 };
+
+using WinProcess_t = std::shared_ptr<WinProcessNative>;
 
 #endif // _WIN_PROCESS_NATIVE_H_

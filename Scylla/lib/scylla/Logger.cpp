@@ -1,10 +1,10 @@
-#include "Logger.h"
+#include "scylla/Logger.h"
 #include <cassert>
 #include <chrono>
 #include <iomanip>
 #include <iostream>
 using namespace std;
-#include "Util.h"
+#include "scylla/Util.h"
 
 const wchar_t scl::Logger::kFileName[] = L"scylla_hide.log";
 

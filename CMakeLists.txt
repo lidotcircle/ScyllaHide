@@ -12,16 +12,7 @@ set(CMAKE_EXE_LINKER_FLAGS_RELEASE    "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /DEBUG 
 set(CXX_STANDARD 17)
 
 add_subdirectory("3rdparty")
-
-set(scylla_SOURCES "")
-file(GLOB_RECURSE scylla_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/Scylla/**.cpp)
-add_library(scylla STATIC ${scylla_SOURCES})
-target_include_directories(scylla PUBLIC ${CMAKE_CURRENT_LIST_DIR})
-target_include_directories(scylla PUBLIC ${CMAKE_CURRENT_LIST_DIR}/Scylla/include)
-target_link_libraries(scylla PUBLIC ntdll)
-target_link_libraries(scylla PUBLIC distorm3)
-target_link_libraries(scylla PUBLIC cxxopts)
-target_link_libraries(scylla PUBLIC pe-parser-static)
+add_subdirectory("Scylla")
 
 set(PluginGeneric_SOURCES "")
 file(GLOB_RECURSE PluginGeneric_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/PluginGeneric/**.cpp)

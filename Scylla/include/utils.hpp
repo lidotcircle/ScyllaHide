@@ -52,6 +52,10 @@ private:
     bool m_bOwner;
 };
 
+/**
+ * !!! be carefully, this object should be keep in a scoped variable,
+ * otherwise it will be destroyed immediately
+ */
 template <typename F>
 deferred_call<F> defer(F&& f)
 {

@@ -1,6 +1,6 @@
-#include "Util.h"
 #include <cstdio>
-#include "NtApiShim.h"
+#include "scylla/Util.h"
+#include "scylla/NtApiShim.h"
 
 std::wstring scl::fmtw(const wchar_t *fmt, ...)
 {

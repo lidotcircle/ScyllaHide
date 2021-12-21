@@ -1,7 +1,7 @@
-#include "User32Loader.h"
-#include "Win32kSyscalls.h"
-#include "Scylla/OsInfo.h"
-#include "Scylla/Logger.h"
+#include "scylla/User32Loader.h"
+#include "scylla/Win32kSyscalls.h"
+#include "scylla/OsInfo.h"
+#include "scylla/Logger.h"
 
 extern scl::Logger g_log;
 

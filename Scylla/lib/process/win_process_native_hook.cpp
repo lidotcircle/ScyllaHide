@@ -192,7 +192,7 @@ hook_t WinProcessNative::hook(addr_t original, addr_t hook) {
     if (!trampoline)
         return nullptr;
     bool clean_trampoline = false;
-    defer([&]() { if (clean_trampoline) this->free(trampoline); });
+    auto d1 = defer([&]() { if (clean_trampoline) this->free(trampoline); });
 
     vector<char> detour_data(originalBytes.begin(), originalBytes.begin() + detourLen);
     auto trampoline_data = RedirectRelativeJmp(reinterpret_cast<void*>(original), trampoline, detour_data);

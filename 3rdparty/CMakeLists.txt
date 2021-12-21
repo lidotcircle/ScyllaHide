@@ -17,6 +17,9 @@ add_library(cxxopts INTERFACE)
 target_include_directories(cxxopts INTERFACE ${CMAKE_CURRENT_LIST_DIR}/cxxopts/include)
 
 
+add_subdirectory(yaml-cpp)
+
+
 set(PEPARSE_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/pe-parse/pe-parser-library)
 list(APPEND PEPARSERLIB_SOURCEFILES
   ${PEPARSE_SOURCE_DIR}/src/buffer.cpp

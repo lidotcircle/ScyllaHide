@@ -14,8 +14,16 @@
 #include <assert.h>
 using namespace std;
 
+static bool is_2pow(size_t n) {
+    return (n & (n - 1)) == 0;
+}
+
 static char* align_ptr(char* ptr, size_t align) {
-    return (char*)(((size_t)ptr + align - 1) & ~(align - 1));
+    if (!is_2pow(align))
+        throw runtime_error("align must be a power of 2");
+
+    size_t pv = reinterpret_cast<size_t>(ptr);
+    return (char*)((pv + align - 1) & ~(align - 1));
 }
 
 static size_t round_to_2pow(size_t size) {
@@ -44,6 +52,14 @@ public:
         auto ptr_end = ptr + page->size();
         for (;ptr < ptr_end; ptr = align_ptr(ptr, align)) {
             auto lb = allocations.lower_bound(ptr);
+            if (lb == allocations.end()){
+                if (!allocations.empty()) lb--;
+            } else if (lb->first > ptr) {
+                if (lb == allocations.begin())
+                    lb = allocations.end();
+                else
+                    lb--;
+            }
             if (lb != allocations.end() && lb->first + lb->second > ptr) {
                 ptr = lb->first + lb->second;
                 continue;
@@ -59,6 +75,7 @@ public:
                 continue;
             }
 
+            assert(allocations.find(ptr) == allocations.end());
             allocations[ptr] = size;
             return ptr;
         }

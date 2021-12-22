@@ -174,9 +174,6 @@ void WinProcessNative::refresh_process()
     this->clear_modules();
     vector<tuple<void*,size_t,string>> modules;
 
-
-#if defined(_WIN64)
-    // List modules on a 64 bit machine. A 64 bit machine is assumed to be Windows Vista+
     HMODULE hMods[2048];
     DWORD cbNeeded;
     unsigned int i;
@@ -196,28 +193,6 @@ void WinProcessNative::refresh_process()
             throw runtime_error("GetModuleInformation failed");
         }
     }
-
-#elif defined(_WIN32)
-
-    HANDLE hSnapshot=CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, this->process_id);
-    if ( hSnapshot == INVALID_HANDLE_VALUE )
-    {
-        throw runtime_error("CreateToolhelp32Snapshot failed");
-    }
-
-    MODULEENTRY32 tmpModule;
-    tmpModule.dwSize = sizeof(MODULEENTRY32);
-    if( Module32First(hSnapshot, &tmpModule) )
-    {
-        modules.push_back(make_tuple(tmpModule.modBaseAddr, tmpModule.modBaseSize, string(tmpModule.szModule)));
-
-        tmpModule.dwSize = sizeof(MODULEENTRY32);
-        while(Module32Next(hSnapshot,&tmpModule))
-        {
-            modules.push_back(make_tuple(tmpModule.modBaseAddr, tmpModule.modBaseSize, string(tmpModule.szModule)));
-        }
-    }
-#endif // _WIN64
 
     this->add_nomodule_pages();
 

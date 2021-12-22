@@ -1,6 +1,7 @@
 #include "process/memory_map_module.h"
 #include "process/memory_map_section.h"
 #include "process/pe_header.h"
+#include "str_utils.h"
 #include <algorithm>
 #include <map>
 #include <string>
@@ -42,29 +43,39 @@ size_t MemoryMapModule::size() const {
 }
 
 char MemoryMapModule::get_at(addr_t index) const {
-    index += this->base_addr;
-    auto page = std::lower_bound(this->pages.begin(), this->pages.end(), index, [](const std::shared_ptr<MemoryMap>& page, addr_t index) {
-        return page->baseaddr() + page->size() <= index;
+   index += this->base_addr;
+    auto ipage = std::upper_bound(this->pages.begin(), this->pages.end(), index, [](addr_t index, const std::shared_ptr<MemoryMap>& page) {
+        return page->baseaddr() + page->size() > index;
     });
 
-    if (page == this->pages.end()) {
-        throw std::runtime_error("MemoryMapModule: index out of range or there is a hole");
-    }
+    if (ipage == this->pages.end())
+        throw std::runtime_error(
+            strformat("MemoryMapModule::get_at(0x%x): index out of range or there is a hole", index));
 
-    return (*page)->get_at(index - (*page)->baseaddr());
+    auto page = *ipage;
+    if (page->baseaddr() > index || page->baseaddr() + page->size() <= index)
+        throw std::runtime_error(
+            strformat("MemoryMapModule::get_at(0x%x): index out of range or there is a hole", index));
+
+    return page->get_at(index - page->baseaddr());
 }
 
 void MemoryMapModule::set_at(addr_t index, char value) {
     index += this->base_addr;
-    auto page = std::lower_bound(this->pages.begin(), this->pages.end(), index, [](const std::shared_ptr<MemoryMap>& page, addr_t index) {
-        return page->baseaddr() + page->size() <= index;
+    auto ipage = std::upper_bound(this->pages.begin(), this->pages.end(), index, [](addr_t index, const std::shared_ptr<MemoryMap>& page) {
+        return page->baseaddr() + page->size() > index;
     });
 
-    if (page == this->pages.end()) {
-        throw std::runtime_error("MemoryMapModule: index out of range or there is a hole");
-    }
+    if (ipage == this->pages.end())
+        throw std::runtime_error(
+            strformat("MemoryMapModule::set_at(0x%x): index out of range or there is a hole", index));
 
-    (*page)->set_at(index - (*page)->baseaddr(), value);
+    auto page = *ipage;
+    if (page->baseaddr() > index || page->baseaddr() + page->size() <= index)
+        throw std::runtime_error(
+            strformat("MemoryMapModule::set_at(0x%x): index out of range or there is a hole", index));
+
+    page->set_at(index - page->baseaddr(), value);
 }
 
 MemoryMapModule::SectionMapType& MemoryMapModule::get_sections() {

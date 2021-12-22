@@ -249,7 +249,7 @@ void WinProcessNative::refresh_process()
             auto first_page = std::lower_bound(
                 this->process_maps.begin(), this->process_maps.end(), sec_base,
                 less_func);
-            void* sec_end = reinterpret_cast<void*>(sec.VirtualAddress + tpage->baseaddr() + sec.SizeOfRawData);
+            void* sec_end = reinterpret_cast<void*>(sec.VirtualAddress + tpage->baseaddr() + sec.Misc.VirtualSize);
             auto end_page = std::lower_bound(
                 this->process_maps.begin(), this->process_maps.end(), sec_end,
                 less_func);

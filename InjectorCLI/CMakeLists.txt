@@ -11,3 +11,4 @@ target_include_directories(InjectorCLI PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 
 target_link_libraries(InjectorCLI scylla)
 target_link_libraries(InjectorCLI PluginGeneric)
+target_link_libraries(InjectorCLI HookLibraryResource)

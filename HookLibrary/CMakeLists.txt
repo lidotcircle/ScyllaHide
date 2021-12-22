@@ -18,3 +18,13 @@ endif()
 target_include_directories(HookLibrary PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 
 target_link_libraries(HookLibrary scylla)
+
+set(HookLibraryOutputFile $<TARGET_FILE:HookLibrary>)
+add_custom_target(generate_c_resource COMMAND ${CMAKE_COMMAND} 
+                    -DHL_FILENAME="${HookLibraryOutputFile}"
+                    -P ${CMAKE_CURRENT_LIST_DIR}/HookLibraryResource.cmake)
+add_dependencies(generate_c_resource HookLibrary)
+
+add_library(HookLibraryResource INTERFACE)
+target_include_directories(HookLibraryResource INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+add_dependencies(HookLibraryResource generate_c_resource)

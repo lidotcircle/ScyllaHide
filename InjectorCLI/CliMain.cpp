@@ -14,6 +14,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <cxxopts.hpp>
+#include "hook_library.h"
 
 #include "logger/udp_console_log_server.h"
 #include "DynamicMapping.h"

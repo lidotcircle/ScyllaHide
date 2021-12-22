@@ -430,19 +430,26 @@ bool WinProcessNative::write(MemoryMap::addr_t addr, const void* data, size_t si
     for (size_t i=0;i<size;i++) {
         try {
             this->set_at(addr + i, cdata[i]);
-        } catch (runtime_error&) {
+        } catch (exception& e) {
+            cerr << "addr = 0x" << hex << addr << ", i = " << i << ", size = " << size << endl;
+            cerr << "WinProcessNative::write(): " << e.what() << endl;
             return false;
         }
     }
-    this->flush();
-    return true;
+
+    try {
+        this->flush();
+        return true;
+    } catch (exception&) {
+        return false;
+    }
 }
 bool WinProcessNative::read(MemoryMap::addr_t addr, void* data, size_t size) {
     auto cdata = static_cast<char*>(data);
     for (size_t i=0;i<size;i++) {
         try {
             cdata[i] = this->get_at(addr + i);
-        } catch(runtime_error&) {
+        } catch(exception&) {
             return false;
         }
     }

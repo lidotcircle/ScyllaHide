@@ -1,6 +1,7 @@
 #if defined(_WIN32) || defined(_WIN64)
 #include "process/memory_map_win_page.h"
 #include "utils.hpp"
+#include "str_utils.h"
 #include <stdexcept>
 #include <Windows.h>
 #include <string>
@@ -62,7 +63,8 @@ static bool page_executable(int prot) {
 
 char MemoryMapWinPage::get_at(addr_t offset) const {
     if (offset >= map_size)
-        throw out_of_range("offset out of range");
+        throw out_of_range(
+            strformat("MemoryMapWinPage::get_at(0x%lx): offset out of range", offset));
 
     auto _this = const_cast<MemoryMapWinPage*>(this);
 
@@ -78,13 +80,13 @@ char MemoryMapWinPage::get_at(addr_t offset) const {
 
     MEMORY_BASIC_INFORMATION mbi;
     if (!VirtualQueryEx(*_this->process_handle.get(), addr, &mbi, sizeof(mbi))) {
-        throw runtime_error("VirtualQueryEx failed");
+        throw runtime_error("MemoryMapWinPage::get_at(): VirtualQueryEx failed");
     }
     DWORD alloc_protect = mbi.AllocationProtect, old_protect;
     bool readable = page_readable(mbi.Protect);
 
     if (!readable && !VirtualProtectEx(*this->process_handle.get(), addr, CACHE_SIZE, alloc_protect, &old_protect)) {
-        throw runtime_error("X VirtualProtectEx failed: 0x" + addr2hexstr(addr));
+        throw runtime_error("MemoryMapWinPage::get_at(): VirtualProtectEx failed: 0x" + addr2hexstr(addr));
     }
 
     auto cleanProtectEx = defer([&]() {
@@ -94,7 +96,7 @@ char MemoryMapWinPage::get_at(addr_t offset) const {
 
     SIZE_T n;
     if (!ReadProcessMemory(*this->process_handle.get(), addr, cache, CACHE_SIZE, &n)) {
-        throw runtime_error("ReadProcessMemory failed at: 0x" + addr2hexstr(addr) + 
+        throw runtime_error("MemoryMapWinPage::get_at(): ReadProcessMemory failed at: 0x" + addr2hexstr(addr) + 
                             ", region base: 0x" + integer2hexstr(base));
     }
 
@@ -105,21 +107,22 @@ char MemoryMapWinPage::get_at(addr_t offset) const {
 
 void MemoryMapWinPage::set_at(addr_t offset, char value) {
     if (offset >= map_size)
-        throw out_of_range("offset out of range");
+        throw out_of_range(
+            strformat("MemoryMapWinPage::set_at(%lx, %c)[map_size = %lx]: offset out of range", offset, value, map_size));
 
     auto addr = reinterpret_cast<void*>(this->baseaddress + offset);
     if (this->direct_write) {
         DWORD old_protect;
         if (!VirtualProtectEx(*this->process_handle.get(), addr, CACHE_SIZE, PAGE_READWRITE, &old_protect))
         {
-            throw runtime_error("Y VirtualProtectEx failed: 0x" + addr2hexstr(addr));
+            throw runtime_error("MemoryMapWinPage::set_at(): VirtualProtectEx failed: 0x" + addr2hexstr(addr));
         }
 
         auto result = WriteProcessMemory(*this->process_handle.get(), addr, &value, 1, nullptr);
         VirtualProtectEx(*this->process_handle.get(), addr, CACHE_SIZE, old_protect, &old_protect);
         
         if (!result) {
-            throw runtime_error("WriteProcessMemory failed");
+            throw runtime_error("MemoryMapWinPage::set_at(): WriteProcessMemory failed");
         }
         return;
     }

@@ -38,6 +38,7 @@ private:
     void refresh_process();
     void add_nomodule_pages();
 
+    void inject_dll_stealthy   (const unsigned char* buffer, size_t size, const std::string& dllname);
     void inject_dll_stealthy   (const std::string& dll_path);
     void inject_dll_loadlibrary(const std::string& dll_path);
 
@@ -77,6 +78,8 @@ public:
     inline hook_t hook(void* original, void* hook) {return this->hook(reinterpret_cast<addr_t>(original), reinterpret_cast<addr_t>(hook));}
 
     void inject_dll(const std::string& dll_path, bool stealthy);
+    void inject_dll(const unsigned char* buffer, size_t buffer_size,
+                    const std::string& dllname, bool stealthy);
 
     void refresh();
 };

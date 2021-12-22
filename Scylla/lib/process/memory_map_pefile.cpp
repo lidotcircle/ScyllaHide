@@ -40,12 +40,12 @@ void MemoryMapPEFile::parse_data(const vector<char>& buf) {
     std::copy(buf.begin(), buf.begin() + header.sizeOfHeaders(), image_data.begin());
 
     for(auto& sec: header.section_hdrs) {
-        if (sec.VirtualAddress + sec.SizeOfRawData > image_data.size())
+        if (sec.VirtualAddress + sec.Misc.VirtualSize > image_data.size())
             throw runtime_error("invalid pe file, section VirtualAddress is too large");
         
         std::copy(buf.begin() + sec.PointerToRawData, 
-                 buf.begin() + sec.PointerToRawData + sec.SizeOfRawData,
-                 image_data.begin() + sec.VirtualAddress);
+                  buf.begin() + sec.PointerToRawData + sec.SizeOfRawData,
+                  image_data.begin() + sec.VirtualAddress);
     }
 
     this->data = std::move(image_data);

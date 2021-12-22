@@ -1,69 +1,63 @@
-#include "HookHelper.h"
-
 #include <ntdll/ntdll.h>
+#include "hook_helper.h"
 
-#include "HookedFunctions.h"
-#include "HookMain.h"
 
-const WCHAR * BadProcessnameList[] =
+const char * BadProcessnameList[] =
 {
-	L"ollydbg.exe",
-	L"ida.exe",
-	L"ida64.exe",
-	L"idag.exe",
-	L"idag64.exe",
-	L"idaw.exe",
-	L"idaw64.exe",
-	L"idaq.exe",
-	L"idaq64.exe",
-	L"idau.exe",
-	L"idau64.exe",
-	L"scylla.exe",
-	L"scylla_x64.exe",
-	L"scylla_x86.exe",
-	L"protection_id.exe",
-	L"x64dbg.exe",
-	L"x32dbg.exe",
-	L"windbg.exe",
-	L"reshacker.exe",
-	L"ImportREC.exe",
-	L"IMMUNITYDEBUGGER.EXE",
-	L"devenv.exe"
+	"ollydbg.exe",
+	"ida.exe",
+	"ida64.exe",
+	"idag.exe",
+	"idag64.exe",
+	"idaw.exe",
+	"idaw64.exe",
+	"idaq.exe",
+	"idaq64.exe",
+	"idau.exe",
+	"idau64.exe",
+	"scylla.exe",
+	"scylla_x64.exe",
+	"scylla_x86.exe",
+	"protection_id.exe",
+	"x64dbg.exe",
+	"x32dbg.exe",
+	"windbg.exe",
+	"reshacker.exe",
+	"ImportREC.exe",
+	"IMMUNITYDEBUGGER.EXE",
+	"devenv.exe"
 };
 
-const WCHAR * BadWindowTextList[] =
+const char * BadWindowTextList[] =
 {
-	L"OLLYDBG",
-	L"ida",
-	L"disassembly",
-	L"scylla",
-	L"Debug",
-	L"[CPU",
-	L"Immunity",
-	L"WinDbg",
-	L"x32dbg",
-	L"x64dbg",
-	L"Import reconstructor"
+	"OLLYDBG",
+	"ida",
+	"disassembly",
+	"scylla",
+	"Debug",
+	"[CPU",
+	"Immunity",
+	"WinDbg",
+	"x32dbg",
+	"x64dbg",
+	"Import reconstructor"
 };
 
-const WCHAR * BadWindowClassList[] =
+const char * BadWindowClassList[] =
 {
-	L"OLLYDBG",
-	L"Zeta Debugger",
-	L"Rock Debugger",
-	L"ObsidianGUI",
-	L"ID", //Immunity Debugger
-	L"WinDbgFrameClass", //WinDBG
-	L"idawindow",
-	L"tnavbox",
-	L"idaview",
-	L"tgrzoom"
+	"OLLYDBG",
+	"Zeta Debugger",
+	"Rock Debugger",
+	"ObsidianGUI",
+	"ID", //Immunity Debugger
+	"WinDbgFrameClass", //WinDBG
+	"idawindow",
+	"tnavbox",
+	"idaview",
+	"tgrzoom"
 };
 
 extern "C" void InstrumentationCallbackAsm();
-
-extern HOOK_DLL_DATA HookDllData;
-extern SAVE_DEBUG_REGISTERS ArrayDebugRegister[100];
 
 static USHORT DebugObjectTypeIndex = 0;
 static USHORT ProcessTypeIndex = 0;
@@ -116,7 +110,8 @@ bool IsWindowNameBad(PUNICODE_STRING windowName)
 
 bool IsWindowBad(HWND hWnd)
 {
-	if (HookDllData.EnableProtectProcessId)
+	// TODO: HookDllData.EnableProtectProcessId
+	if (true)
 	{
 		const ULONG Pid = HookDllData.dNtUserQueryWindow != nullptr
 			? HandleToULong(HookDllData.dNtUserQueryWindow(hWnd, WindowProcess))

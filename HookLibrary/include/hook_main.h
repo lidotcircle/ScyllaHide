@@ -2,7 +2,6 @@
 
 #include <ntdll/ntdll.h>
 
-
 #define STATUS_PRIVILEGE_NOT_HELD ((NTSTATUS)0xC0000061L)
 #define STATUS_PORT_NOT_SET ((NTSTATUS)0xC0000353L)
 #define STATUS_HANDLE_NOT_CLOSABLE ((NTSTATUS)0xC0000235L)
@@ -29,3 +28,4 @@ typedef struct _SAVE_DEBUG_REGISTERS
 } SAVE_DEBUG_REGISTERS;
 
 #define DLLExport __declspec(dllexport)
+#define DLLExport_C extern "C" __declspec(dllexport)

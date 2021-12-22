@@ -2,8 +2,8 @@
 #include <WinUser.h>
 #include <new.h>
 #include <assert.h>
-#include "HookMain.h"
-#include "LogClient.h"
+#include "exchange_data.h"
+#include "hook_log_client.h"
 
 WSADATA wsaData;
 static decltype(socket)*      fsocket      = nullptr;
@@ -109,7 +109,7 @@ LogClient* logClient() {
     if (_logClient != nullptr)
         return _logClient;
 
-    _logClient = new ((LogClient*)&_bytes) LogClient(HookDllData.udpIPCPort, HookDllData.udpIPCAddr);
+    _logClient = new ((LogClient*)&_bytes) LogClient(exchange_data.m_udp_port, exchange_data.m_udp_addr);
 
     char hello[] = "hello server";
     _logClient->send(hello, sizeof(hello));

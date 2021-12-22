@@ -19,7 +19,7 @@
 #include "logger/udp_console_log_server.h"
 #include "DynamicMapping.h"
 #include "ApplyHooking.h"
-#include "../HookLibrary/HookMain.h"
+#include "../HookLibrary/include/HookMain.h"
 #include "../PluginGeneric/Injector.h"
 #include "scylla/exchange_mx.h"
 using namespace std;
@@ -251,8 +251,16 @@ int main(int argc, char* argv[])
                 ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
             }
 
+
             targetPid = pi.dwProcessId;
             newProcess = true;
+
+            if(!DebugActiveProcessStop(pi.dwProcessId)){
+                fprintf(stderr, "detach failed; error code = 0x%08X\n", GetLastError());
+            }
+            else {
+                printf("resume process\n");
+            }
         }
         else
             targetPid = GetProcessIdByName(argv[1]);
@@ -275,7 +283,17 @@ int main(int argc, char* argv[])
     }
 
     int result = 0;
-    auto process = make_shared<WinProcessNative>(targetPid);
+    std::shared_ptr<WinProcessNative> process;
+    try {
+        process = make_shared<WinProcessNative>(targetPid);
+    } catch(exception& e) {
+        cerr << e.what() << endl;
+        return 1;
+    }
+    if (!process) {
+        cerr << "can't get process handle" << endl;
+        return 1;
+    }
     ExchangeDataMX mx(process);
     mx.set_udp_port(udpPort);
     mx.set_udp_addr(udpAddr);
@@ -299,7 +317,7 @@ int main(int argc, char* argv[])
         printf("Usage: %s new:<executable> <dll path>",            argv[0]);
     }
 
-    if (newProcess) {
+    if (newProcess && false) {
         if(!DebugActiveProcessStop(pi.dwProcessId)){
             fprintf(stderr, "detach failed; error code = 0x%08X\n", GetLastError());
             result = 1;
@@ -359,7 +377,7 @@ bool startInjectionProcess(Process_t process, const char* dllpath)
     bool success = false;
     if (injectDll)
     {
-        process->inject_dll(dllpath, true);
+        process->inject_dll(hook_library, hook_library_size, dllpath, true);
         auto dllmodule = process->find_module(dllpath);
         if (!dllmodule)
         {

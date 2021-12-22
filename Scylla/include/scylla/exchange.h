@@ -28,6 +28,21 @@ struct ExchangeData {
     void* lookup_trampoline(const char* funcname);
     void* lookup_trampoline(const char* dllname, const char* funcname);
 
+    template<typename T>
+    T lookup_trampoline(void* hook) {
+        return static_cast<T>(lookup_trampoline(hook));
+    }
+
+    template<typename T>
+    T lookup_trampoline(const char* funcname) {
+        return static_cast<T>(lookup_trampoline(funcname));
+    }
+
+    template<typename T>
+    T lookup_trampoline(const char* dllname, const char* funcname) {
+        return static_cast<T>(lookup_trampoline(dllname, funcname));
+    }
+
     const char* lookup_key(const char* key);
 };
 

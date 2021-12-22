@@ -24,13 +24,6 @@ endfunction()
 
 add_subdirectory("3rdparty")
 add_subdirectory("Scylla")
-
-set(PluginGeneric_SOURCES "")
-file(GLOB_RECURSE PluginGeneric_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/PluginGeneric/**.cpp)
-add_library(PluginGeneric STATIC ${PluginGeneric_SOURCES})
-target_include_directories(PluginGeneric PUBLIC ${CMAKE_CURRENT_LIST_DIR})
-target_link_libraries(PluginGeneric PUBLIC scylla)
-
 add_subdirectory("HookLibrary")
 add_subdirectory("InjectorCLI")
 add_subdirectory("ScyllaTest")

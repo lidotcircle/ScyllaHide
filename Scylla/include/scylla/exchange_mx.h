@@ -29,6 +29,7 @@ public:
     void set_udp_addr(uint32_t addr);
 
     void add_entry(const std::string& dll, const std::string& func, void* hook, void* trampoline);
+    void remove_entry_by_trampoline(void* trampoline);
     void add_key_value(const std::string& key, const std::string& value);
 
     void dump_to_process(void* addr);

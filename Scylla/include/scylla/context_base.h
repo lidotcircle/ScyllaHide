@@ -35,8 +35,27 @@ public:
     const ExchangeDataMX& exchange() const;
 
     void add_item(const std::string& name, std::shared_ptr<ScyllaContextItem> item);
+    void remove_item(const std::string& name);
     std::shared_ptr<ScyllaContextItem> get_item(const std::string& name);
     const std::shared_ptr<ScyllaContextItem> get_item(const std::string& name) const;
+
+    template<typename T>
+    std::shared_ptr<T> get_item(const std::string& name) {
+        auto it = m_items.find(name);
+        if (it == m_items.end())
+            return nullptr;
+
+        return std::dynamic_pointer_cast<T>(it->second);
+    }
+
+    template<typename T>
+    const std::shared_ptr<T> get_item(const std::string& name) const {
+        auto it = m_items.find(name);
+        if (it == m_items.end())
+            return nullptr;
+
+        return std::dynamic_pointer_cast<T>(it->second);
+    }
 
     virtual ~ScyllaContextBase();
 };

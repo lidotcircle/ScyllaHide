@@ -29,6 +29,17 @@ void ExchangeDataMX::add_entry(const std::string& dll, const std::string& func, 
     m_entries.push_back(entry);
 }
 
+void ExchangeDataMX::remove_entry_by_trampoline(void* trmapoline) {
+    for (auto it = m_entries.begin(); it != m_entries.end(); it++) {
+        if (it->trampoline == trmapoline) {
+            m_entries.erase(it);
+            return;
+        }
+    }
+
+    throw runtime_error("can't find trampoline");
+}
+
 void ExchangeDataMX::add_key_value(const std::string& key, const std::string& value) {
     if (m_key_value_str.find(key) != m_key_value_str.end())
         throw runtime_error("key already exists");

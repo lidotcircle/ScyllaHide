@@ -32,6 +32,14 @@ void ScyllaContextBase::add_item(const string& name, std::shared_ptr<ScyllaConte
 
     m_items[name] = item;
 }
+void ScyllaContextBase::remove_item(const std::string& name) {
+    auto it = m_items.find(name);
+    if (it == m_items.end()) {
+        throw runtime_error("ScyllaContextBase::remove_item(): item with name '" + name + "' not found");
+    }
+
+    m_items.erase(it);
+}
 shared_ptr<ScyllaContextItem> ScyllaContextBase::get_item(const string& name) {
     auto it = m_items.find(name);
     if (it == m_items.end())

@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <regex>
 #include <map>
 
 union ImportEntry {
@@ -71,6 +72,7 @@ public:
 
     const std::map<uint32_t,std::pair<std::string,addr_t>>&   exports() const;
     addr_t resolve_export(const std::string& name) const;
+    addr_t resolve_export(const std::regex& regex, std::string& symbol) const;
     addr_t resolve_export(uint32_t ordinal) const;
     const std::map<std::string,std::map<ImportEntry,addr_t>>& imports() const;
 

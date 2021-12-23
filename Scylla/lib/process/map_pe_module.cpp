@@ -2,6 +2,7 @@
 #include "process/memory_map_slice_ref.h"
 #include <stdexcept>
 #include <iostream>
+#include <regex>
 using namespace std;
 using namespace peparse;
 
@@ -261,6 +262,27 @@ addr_t MapPEModule::resolve_export(const std::string& name) const {
     }
 
     throw runtime_error("export symbol '" + name + "' not found");
+}
+
+addr_t MapPEModule::resolve_export(const regex& re, string& symbol) const {
+    auto& exports = this->exports();
+    bool found = false;
+    addr_t ret = 0;
+
+    for (auto& e: exports) {
+        if (std::regex_match(e.second.first, re)) {
+            if (found)
+                throw runtime_error("multiple symbols match regex");
+            ret = e.second.second;
+            symbol = e.second.first;
+            found = true;
+        }
+    }
+
+    if (!found)
+        throw runtime_error("export symbol regex not found");
+    
+    return ret;
 }
 
 addr_t MapPEModule::resolve_export(uint32_t ordinal) const {

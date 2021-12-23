@@ -5,6 +5,7 @@
 
 extern "C" {
 
+__declspec(dllexport)
 extern ExchangeData exchange_data;
 
 }

@@ -7,7 +7,7 @@
 
 static DWORD OneTickCount = 0;
 
-DWORD WINAPI HookedGetTickCount(void)
+DLLExport_C DWORD WINAPI HookedGetTickCount(void)
 {
     if (!OneTickCount)
     {
@@ -23,7 +23,7 @@ DWORD WINAPI HookedGetTickCount(void)
     return OneTickCount;
 }
 
-ULONGLONG WINAPI HookedGetTickCount64(void) //yes we can use DWORD
+DLLExport_C ULONGLONG WINAPI HookedGetTickCount64(void) //yes we can use DWORD
 {
     if (!OneTickCount)
     {
@@ -46,7 +46,7 @@ ULONGLONG WINAPI HookedGetTickCount64(void) //yes we can use DWORD
 static SYSTEMTIME OneLocalTime = {0};
 static SYSTEMTIME OneSystemTime = {0};
 
-void WINAPI HookedGetLocalTime(LPSYSTEMTIME lpSystemTime)
+DLLExport_C void WINAPI HookedGetLocalTime(LPSYSTEMTIME lpSystemTime)
 {
     auto dGetSystemTime = exchange_data.lookup_trampoline<decltype(&GetSystemTime)>(&GetSystemTime);
 
@@ -75,7 +75,7 @@ void WINAPI HookedGetLocalTime(LPSYSTEMTIME lpSystemTime)
     }
 }
 
-void WINAPI HookedGetSystemTime(LPSYSTEMTIME lpSystemTime)
+DLLExport_C void WINAPI HookedGetSystemTime(LPSYSTEMTIME lpSystemTime)
 {
     auto dGetLocalTime = exchange_data.lookup_trampoline<decltype(&GetLocalTime)>(&GetLocalTime);
 

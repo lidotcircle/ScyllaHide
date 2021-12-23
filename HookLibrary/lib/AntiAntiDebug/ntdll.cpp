@@ -3,6 +3,7 @@
 #include "hook_main.h"
 #include "hook_helper.h"
 #include "hook_log_client.h"
+#include "Tls.h"
 
 
 #define BACKUP_RETURNLENGTH() \
@@ -448,17 +449,6 @@ DLLExport_C NTSTATUS NTAPI HookedNtSetInformationProcess(HANDLE ProcessHandle, P
 }
 
 
-static void FilterObjects(POBJECT_TYPES_INFORMATION pObjectTypes)
-{
-    POBJECT_TYPE_INFORMATION pObject = pObjectTypes->TypeInformation;
-    for (ULONG i = 0; i < pObjectTypes->NumberOfTypes; i++)
-    {
-        FilterObject(pObject, true);
-
-        pObject = (POBJECT_TYPE_INFORMATION)(((PCHAR)(pObject + 1) + ALIGN_UP(pObject->TypeName.MaximumLength, ULONG_PTR)));
-    }
-}
-
 static void FilterObject(POBJECT_TYPE_INFORMATION pObject, bool zeroTotal)
 {
     UNICODE_STRING debugObjectName = RTL_CONSTANT_STRING(L"DebugObject");
@@ -467,6 +457,17 @@ static void FilterObject(POBJECT_TYPE_INFORMATION pObject, bool zeroTotal)
         // Subtract just one from both counts for our debugger, unless the query was a generic one for all object types
         pObject->TotalNumberOfObjects = zeroTotal || pObject->TotalNumberOfObjects == 0 ? 0 : pObject->TotalNumberOfObjects - 1;
         pObject->TotalNumberOfHandles = zeroTotal || pObject->TotalNumberOfHandles == 0 ? 0 : pObject->TotalNumberOfHandles - 1;
+    }
+}
+
+static void FilterObjects(POBJECT_TYPES_INFORMATION pObjectTypes)
+{
+    POBJECT_TYPE_INFORMATION pObject = pObjectTypes->TypeInformation;
+    for (ULONG i = 0; i < pObjectTypes->NumberOfTypes; i++)
+    {
+        FilterObject(pObject, true);
+
+        pObject = (POBJECT_TYPE_INFORMATION)(((PCHAR)(pObject + 1) + ALIGN_UP(pObject->TypeName.MaximumLength, ULONG_PTR)));
     }
 }
 
@@ -573,6 +574,53 @@ DLLExport_C NTSTATUS NTAPI HookedNtSetContextThread(HANDLE ThreadHandle, PCONTEX
 }
 
 
+static SAVE_DEBUG_REGISTERS ArrayDebugRegister[100] = { 0 }; //Max 100 threads
+static void ThreadDebugContextRemoveEntry(const int index)
+{
+    ArrayDebugRegister[index].dwThreadId = 0;
+}
+
+static void ThreadDebugContextSaveContext(const int index, const PCONTEXT ThreadContext)
+{
+    ArrayDebugRegister[index].dwThreadId = HandleToULong(NtCurrentTeb()->ClientId.UniqueThread);
+    ArrayDebugRegister[index].Dr0 = ThreadContext->Dr0;
+    ArrayDebugRegister[index].Dr1 = ThreadContext->Dr1;
+    ArrayDebugRegister[index].Dr2 = ThreadContext->Dr2;
+    ArrayDebugRegister[index].Dr3 = ThreadContext->Dr3;
+    ArrayDebugRegister[index].Dr6 = ThreadContext->Dr6;
+    ArrayDebugRegister[index].Dr7 = ThreadContext->Dr7;
+}
+
+static int ThreadDebugContextFindExistingSlotIndex()
+{
+    for (int i = 0; i < _countof(ArrayDebugRegister); i++)
+    {
+        if (ArrayDebugRegister[i].dwThreadId != 0)
+        {
+            if (ArrayDebugRegister[i].dwThreadId == HandleToULong(NtCurrentTeb()->ClientId.UniqueThread))
+            {
+                return i;
+            }
+        }
+    }
+
+    return -1;
+}
+
+static int ThreadDebugContextFindFreeSlotIndex()
+{
+    for (int i = 0; i < _countof(ArrayDebugRegister); i++)
+    {
+        if (ArrayDebugRegister[i].dwThreadId == 0)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+
 void NTAPI HandleKiUserExceptionDispatcher(PEXCEPTION_RECORD pExcptRec, PCONTEXT ContextFrame)
 {
     if (ContextFrame && (ContextFrame->ContextFlags & CONTEXT_DEBUG_REGISTERS))
@@ -592,7 +640,6 @@ void NTAPI HandleKiUserExceptionDispatcher(PEXCEPTION_RECORD pExcptRec, PCONTEXT
     }
 }
 
-
 #ifdef _WIN64
 DLLExport_C void NTAPI HookedKiUserExceptionDispatcher()
 {
@@ -609,7 +656,7 @@ DLLExport_C void NTAPI HookedKiUserExceptionDispatcher()
     HandleKiUserExceptionDispatcher(nullptr, ContextFrame);
 }
 #else
-DLLExport_C VOID NAKED NTAPI HookedKiUserExceptionDispatcher()// (PEXCEPTION_RECORD pExcptRec, PCONTEXT ContextFrame) //remove DRx Registers
+DLLExport_C NAKED VOID NTAPI HookedKiUserExceptionDispatcher() // (PEXCEPTION_RECORD pExcptRec, PCONTEXT ContextFrame) //remove DRx Registers
 {
     //MOV ECX,DWORD PTR SS:[ESP+4] <- ContextFrame
     //MOV EBX,DWORD PTR SS:[ESP] <- pExcptRec
@@ -622,8 +669,8 @@ DLLExport_C VOID NAKED NTAPI HookedKiUserExceptionDispatcher()// (PEXCEPTION_REC
         CALL HandleKiUserExceptionDispatcher
     }
 
-    auto dKiUserExceptionDispatcher = 
-        exchange_data.lookup_trampoline<decltype(&KiUserExceptionDispatcher)>(&KiUserExceptionDispatcher);
+    void* dKiUserExceptionDispatcher;
+    dKiUserExceptionDispatcher = exchange_data.lookup_trampoline("KiUserExceptionDispatcher");
 
     __asm
     {
@@ -632,7 +679,6 @@ DLLExport_C VOID NAKED NTAPI HookedKiUserExceptionDispatcher()// (PEXCEPTION_REC
     }
 }
 #endif
-
 
 static DWORD_PTR KiUserExceptionDispatcherAddress = 0;
 DLLExport_C NTSTATUS NTAPI HookedNtContinue(PCONTEXT ThreadContext, BOOLEAN RaiseAlert) //restore DRx Registers
@@ -727,6 +773,7 @@ DLLExport_C NTSTATUS NTAPI HookedNtDuplicateObject(HANDLE SourceProcessHandle, H
 }
 
 
+static LARGE_INTEGER OneNativeSysTime = {0};
 DLLExport_C NTSTATUS WINAPI HookedNtQuerySystemTime(PLARGE_INTEGER SystemTime)
 {
     if (!OneNativeSysTime.QuadPart)
@@ -791,6 +838,7 @@ DLLExport_C NTSTATUS NTAPI HookedNtQueryPerformanceCounter(PLARGE_INTEGER Perfor
 }
 
 
+static BOOL isBlocked = FALSE;
 DLLExport_C BOOL NTAPI HookedNtUserBlockInput(BOOL fBlockIt)
 {
     if (isBlocked == FALSE && fBlockIt != FALSE)
@@ -808,10 +856,26 @@ DLLExport_C BOOL NTAPI HookedNtUserBlockInput(BOOL fBlockIt)
 }
 
 
+DLLExport_C HANDLE NTAPI HookedNtUserQueryWindow(HWND hwnd, WINDOWINFOCLASS WindowInfo)
+{
+    if ((WindowInfo == WindowProcess || WindowInfo == WindowThread) && IsWindowBad(hwnd))
+    {
+        if (WindowInfo == WindowProcess)
+            return NtCurrentTeb()->ClientId.UniqueProcess;
+        if (WindowInfo == WindowThread)
+            return NtCurrentTeb()->ClientId.UniqueThread;
+    }
+    auto dNtUserQueryWindow =
+        exchange_data.lookup_trampoline<decltype(&HookedNtUserQueryWindow)>("NtUserQueryWindow");
+    return dNtUserQueryWindow(hwnd, WindowInfo);
+}
+
+
+
 DLLExport_C HWND NTAPI HookedNtUserFindWindowEx(HWND hWndParent, HWND hWndChildAfter, PUNICODE_STRING lpszClass, PUNICODE_STRING lpszWindow, DWORD dwType)
 {
     auto dNtUserFindWindowEx =
-        exchange_data.lookup_trampoline<decltype(&NtUserFindWindowEx)>(&NtUserFindWindowEx);
+        exchange_data.lookup_trampoline<decltype(&HookedNtUserFindWindowEx)>("NtUserFindWindowEx");
     HWND resultHwnd = dNtUserFindWindowEx(hWndParent, hWndChildAfter, lpszClass, lpszWindow, dwType);
     if (resultHwnd)
     {
@@ -821,11 +885,11 @@ DLLExport_C HWND NTAPI HookedNtUserFindWindowEx(HWND hWndParent, HWND hWndChildA
         }
 
         auto dNtUserQueryWindow =
-            exchange_data.lookup_trampoline<decltype(&NtUserQueryWindow)>(&NtUserQueryWindow);
+            exchange_data.lookup_trampoline<decltype(&HookedNtUserQueryWindow)>("NtUserQueryWindow");
 
         auto enableProtecteProcessId =
             exchange_data.lookup_key("EnableProtecteProcessId");
-        if (enableProtecteProcessId))
+        if (enableProtecteProcessId)
         {
             DWORD dwProcessId;
             if (dNtUserQueryWindow)
@@ -834,7 +898,7 @@ DLLExport_C HWND NTAPI HookedNtUserFindWindowEx(HWND hWndParent, HWND hWndChildA
             }
             else
             {
-                dwProcessId = HandleToULong(NtUserQueryWindow(resultHwnd, WindowProcess));
+                dwProcessId = HandleToULong(HookedNtUserQueryWindow(resultHwnd, WindowProcess));
             }
 
             auto protecteProcessId =
@@ -912,20 +976,6 @@ DLLExport_C NTSTATUS NTAPI HookedNtUserBuildHwndList_Eight(HDESK hDesktop, HWND 
 }
 
 
-DLLExport_C HANDLE NTAPI HookedNtUserQueryWindow(HWND hwnd, WINDOWINFOCLASS WindowInfo)
-{
-    if ((WindowInfo == WindowProcess || WindowInfo == WindowThread) && IsWindowBad(hwnd))
-    {
-        if (WindowInfo == WindowProcess)
-            return NtCurrentTeb()->ClientId.UniqueProcess;
-        if (WindowInfo == WindowThread)
-            return NtCurrentTeb()->ClientId.UniqueThread;
-    }
-    auto dNtUserQueryWindow =
-        exchange_data.lookup_trampoline<decltype(&HookedNtUserQueryWindow)>("NtUserQueryWindow");
-    return dNtUserQueryWindow(hwnd, WindowInfo);
-}
-
 DLLExport_C HWND NTAPI HookedNtUserGetForegroundWindow()
 {
     auto dNtUserGetForegroundWindow =
@@ -977,7 +1027,7 @@ DLLExport_C NTSTATUS NTAPI HookedNtCreateThreadEx(PHANDLE ThreadHandle,ACCESS_MA
     }
 
     auto dNtCreateThreadEx =
-        exchange_data.lookup_trampoline<decltype(&NtCreateThreadEx)>(&NtCreateThreadEx);
+        exchange_data.lookup_trampoline<decltype(&HookedNtCreateThreadEx)>("NtCreateThreadEx");
     return dNtCreateThreadEx(ThreadHandle, DesiredAccess, ObjectAttributes, ProcessHandle, StartRoutine, Argument, CreateFlags, ZeroBits, StackSize, MaximumStackSize,AttributeList);
 }
 

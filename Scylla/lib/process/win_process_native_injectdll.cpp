@@ -20,6 +20,9 @@ static string get_temp_path() {
 }
 
 void WinProcessNative::inject_dll(const string& dll_path, bool stealthy) {
+    if (this->find_module(dll_path))
+        throw runtime_error("inject_dll(): DLL already exists");
+
     if (stealthy)
         this->inject_dll_stealthy(dll_path);
     else
@@ -27,6 +30,9 @@ void WinProcessNative::inject_dll(const string& dll_path, bool stealthy) {
 }
 
 void WinProcessNative::inject_dll(const unsigned char* buffer, size_t size, const string& dllname, bool stealthy) {
+    if (this->find_module(dllname))
+        throw runtime_error("inject_dll(): DLL already exists");
+
     if (stealthy) {
         this->inject_dll_stealthy(buffer, size, dllname);
     } else {

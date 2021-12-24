@@ -2,7 +2,9 @@
 # set(InjectorCLI_SOURCES "")
 # file(GLOB_RECURSE InjectorCLI_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/**.cpp)
 set(InjectorCLI_SOURCES
-    ${CMAKE_CURRENT_LIST_DIR}/main.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/main.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
+    )
 add_executable(InjectorCLI ${InjectorCLI_SOURCES} ${CMAKE_CURRENT_LIST_DIR}/icon.rc)
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set_target_properties(InjectorCLI PROPERTIES OUTPUT_NAME InjectorCLIx64)

@@ -16,6 +16,11 @@ public:
     virtual ~HookHandle() = default;
 };
 
+class SuspendHandle {
+public:
+    virtual ~SuspendHandle();
+};
+
 class WinProcessNative : public MemoryMapCollection
 {
 public:
@@ -23,6 +28,7 @@ public:
     using ModuleMapType = std::map<std::string,std::shared_ptr<MapPEModule>>;
     using addr_t  = typename MemoryMap::addr_t;
     using hook_t  = std::unique_ptr<HookHandle>;
+    using suspend_t = std::unique_ptr<SuspendHandle>;
 
 private:
     int process_id;
@@ -80,6 +86,9 @@ public:
     void inject_dll(const std::string& dll_path, bool stealthy);
     void inject_dll(const unsigned char* buffer, size_t buffer_size,
                     const std::string& dllname, bool stealthy);
+    
+    suspend_t suspendThread();
+    bool resumeThread(suspend_t handle);
 
     void refresh();
 };

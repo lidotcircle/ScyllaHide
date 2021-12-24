@@ -5,6 +5,9 @@ using namespace std;
 
 namespace scylla {
 
+ScyllaContextItem::~ScyllaContextItem() {}
+
+
 ScyllaContextBase::ScyllaContextBase(std::shared_ptr<WinProcessNative> process)
     : m_process(process)
     , m_exchange(process)

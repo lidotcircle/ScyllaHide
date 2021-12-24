@@ -9,8 +9,10 @@ SPlugManager::SPlugManager(ScyllaContextPtr context): SPlug(context), m_done(fal
 
 void SPlugManager::add_splug(const string& plugname, SPlugFactory plug_factory)
 {
-    if (std::find(m_plugs.begin(), m_plugs.end(), plugname) != m_plugs.end())
-        throw std::runtime_error("SPlugManager:add_splug: plug " + plugname + " already exists");
+    for (auto& p: m_plugs) {
+        if(p.first == plugname)
+            throw std::runtime_error("SPlugManager:add_splug: plug " + plugname + " already exists");
+    }
 
     m_plugs.push_back(make_pair(plugname, std::move(plug_factory(this->context()))));
 }

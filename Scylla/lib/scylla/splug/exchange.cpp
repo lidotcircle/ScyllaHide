@@ -1,6 +1,6 @@
+#include "process/map_pe_module.h"
 #include "scylla/splug/dll_injector.h"
 #include "scylla/splug/exchange.h"
-#include "process/map_pe_module.h"
 #include <stdexcept>
 using namespace std;
 using namespace scylla;

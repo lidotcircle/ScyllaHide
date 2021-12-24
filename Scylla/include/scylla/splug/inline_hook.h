@@ -2,7 +2,7 @@
 #define _SPLUG_INLINE_HOOK_H_
 
 #include "../splug.h"
-#include "../process/win_process_native.h"
+#include "../../process/win_process_native.h"
 #include <vector>
 
 namespace scylla {
@@ -21,7 +21,7 @@ public:
     virtual void doit(const YAML::Node& node) override;
     virtual void undo() override;
 
-    virtual ~SPlugInlineHook() override = default;
+    virtual ~SPlugInlineHook() override;
 };
 
 } // namespace scylla

@@ -1,9 +1,10 @@
-#include "scylla/splug/inline_hook.h"
 #include "process/map_pe_module.h"
+#include "scylla/splug/inline_hook.h"
 #include <stdexcept>
 #include <vector>
 #include <tuple>
 #include <regex>
+#include <string>
 using namespace std;
 
 using addr_t = typename WinProcessNative::addr_t;
@@ -107,15 +108,15 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
         if (val.IsMap()) {
             for (auto it=val.begin();it!=val.end();it++) {
                 string kn = str;
-                auto& k = it->first;
-                auto& v = it->second;
+                auto k = it->first.as<string>();
+                auto v = it->second.as<string>();
                 if (strStartWith(k, "$") || strStartWith(k, "#")) {
                     kn = kn + k;
                 } else {
                     kn = kn + "::" + k;
                 }
 
-                add_hook(kn, v.as<string>());
+                add_hook(kn, v);
             }
         } else if (val.IsScalar()) {
             add_hook(str, val.as<string>());
@@ -132,8 +133,8 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
         auto original_func = get<3>(hook);
 
         auto hh = process->hook(original_addr, hook_addr);
-        this->_hooks.push_back(hh);
-        exch.add_entry(original_mod, original_func, original_addr, hh->trampoline());
+        exch.add_entry(original_mod, original_func, reinterpret_cast<void*>(original_addr), hh->trampoline());
+        this->_hooks.push_back(std::move(hh));
     }
 }
 

@@ -2,6 +2,7 @@
 #include "logger/udp_console_log_server.h"
 #include <stdexcept>
 #include <thread>
+#include <iostream>
 using namespace std;
 using namespace scylla;
 
@@ -30,7 +31,15 @@ namespace scylla {
 
 SPlugLogServer::SPlugLogServer(ScyllaContextPtr context) : SPlug(context) {}
 
-SPlugLogServer::~SPlugLogServer() {}
+SPlugLogServer::~SPlugLogServer() {
+    try {
+        if (this->m_log_server_poll_thread) {
+            this->undo();
+        }
+    } catch (exception& e) {
+        cerr << "SPlugLogServer::~SPlugLogServer: " << e.what() << endl;
+    }
+}
 
 void SPlugLogServer::doit(const YAML::Node& node) {
     if (!node.IsMap())

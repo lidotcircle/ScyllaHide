@@ -29,7 +29,7 @@ void SPlugExchange::doit(const YAML::Node& node) {
         auto& exch_name = dll.second;
         auto rmod = process->find_module(mod);
         if (rmod == nullptr)
-            throw std::runtime_error("SPlugExchange::doit: module not found");
+            throw std::runtime_error("SPlugExchange::doit: module not found '" + mod + "'");
 
         auto addr = rmod->baseaddr() + rmod->resolve_export(exch_name);
         exch.dump_to_process(reinterpret_cast<void*>(addr));

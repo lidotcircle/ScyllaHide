@@ -10,11 +10,18 @@
 #include <Psapi.h>
 #include <set>
 #include "./utils.h"
+#include "utils.hpp"
 using namespace std;
 
 using suspend_t = typename WinProcessNative::suspend_t;
 
-static suspend_t CreateProcessAndSuspend(const string& cmdline, shared_ptr<WinProcessNative>& process)
+enum SuspendingState {
+    SUSPEND_ON_NTDLL_KERNEL32_LOADED,
+    SUSPEND_ON_ALL_MODULE_LOADED,
+    SUSPEND_ON_SYSTEM_BREAKPOINT,
+    SUSPEND_ON_ENTRYPOINT,
+};
+static suspend_t CreateProcessAndSuspend(const string& cmdline, shared_ptr<WinProcessNative>& process, SuspendingState state)
 {
     PROCESS_INFORMATION pi = { 0 };
     STARTUPINFO si = { 0 };
@@ -25,6 +32,7 @@ static suspend_t CreateProcessAndSuspend(const string& cmdline, shared_ptr<WinPr
         cerr << "CreateProcess failed: " << GetLastError() << endl;
         return nullptr;
     }
+    set<string> ntkernel = { "ntdll.dll", "kernel32.dll" };
     char imageName[MAX_PATH];
     auto pathLen = GetModuleFileNameEx(pi.hProcess, nullptr, imageName, MAX_PATH);
     if (pathLen == 0) {
@@ -43,12 +51,6 @@ static suspend_t CreateProcessAndSuspend(const string& cmdline, shared_ptr<WinPr
         std::transform(name.begin(), name.end(), name.begin(), ::tolower);
         require_dlls.insert(name);
     }
-    /*
-    require_dlls = {
-        "kernel32.dll",
-        "ntdll.dll",
-    };
-    */
 
     while (true) {
         if (!WaitForDebugEvent(&de, INFINITE)) {
@@ -71,8 +73,29 @@ static suspend_t CreateProcessAndSuspend(const string& cmdline, shared_ptr<WinPr
             if (require_dlls.find(filename) != require_dlls.end())
                 require_dlls.erase(require_dlls.find(filename));
 
-            if (require_dlls.empty())
+            if (ntkernel.find(filename) != ntkernel.end())
+                ntkernel.erase(ntkernel.find(filename));
+
+            if (require_dlls.empty()) {
+                std::cout << "load all dlls" << endl;
+                require_dlls.insert("");
+
+                if (state == SUSPEND_ON_ALL_MODULE_LOADED)
+                    break;
+            }
+
+            if (ntkernel.empty() && state == SUSPEND_ON_NTDLL_KERNEL32_LOADED)
                 break;
+        }
+        else if (de.dwDebugEventCode == EXCEPTION_DEBUG_EVENT) {
+            if (de.u.Exception.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT) {
+                std::cout << "catch first breakpoint raised by windows" << endl;
+                break;
+            }
+            else {
+                cerr << "unexpected exception: exit" << endl;
+                return nullptr;
+            }
         }
         else if (de.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT) {
             cerr << "unexpected: process exited" << endl;
@@ -83,7 +106,77 @@ static suspend_t CreateProcessAndSuspend(const string& cmdline, shared_ptr<WinPr
     }
 
     process = make_shared<WinProcessNative>(pi.dwProcessId);
+
+    char originChar = '\0';
+    WinProcessNative::addr_t entrypoint;
+    if (state == SUSPEND_ON_ENTRYPOINT) {
+        auto exemod = process->find_module(imagePath);
+        entrypoint = exemod->baseaddr() + exemod->header().entrypointRVA();
+        originChar = process->get_at(entrypoint);
+        process->set_at(entrypoint, '\xcc');
+        process->flush();
+        ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
+
+        std::cout << "EP: 0x" << std::hex << entrypoint << std::dec << endl;
+    }
+
+    while (state == SUSPEND_ON_ENTRYPOINT) {
+        if (!WaitForDebugEvent(&de, INFINITE)) {
+            cerr << "WaitForDebugEvent failed: " << GetLastError() << endl;
+            return nullptr;
+        }
+
+        if (de.dwDebugEventCode == EXCEPTION_DEBUG_EVENT) {
+            if (de.u.Exception.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT) {
+                std::cout << "catch entrypoint breakpoint" << endl;
+                auto thandle = OpenThread(THREAD_ALL_ACCESS, FALSE, de.dwThreadId);
+                if (thandle == INVALID_HANDLE_VALUE) {
+                    cerr << "OpenThread failed: " << GetLastError() << endl;
+                    return nullptr;
+                }
+                auto d1 = defer([&]() { CloseHandle(thandle); });
+
+                CONTEXT ctx = { 0 };
+                if (!GetThreadContext(thandle, &ctx)) {
+                    cerr << "GetThreadContext failed: " << GetLastError() << endl;
+                    return nullptr;
+                }
+
+cout << "ctx.Eip: " << std::hex << ctx.Eip << std::dec << endl;
+#ifdef _WIN64
+                ctx.Rip--;
+#else
+                ctx.Eip--;
+#endif 
+                
+                cout << "  set eip to " << std::hex << ctx.Eip << std::dec << endl;
+                if (!SetThreadContext(thandle, &ctx)) {
+                    cerr << "SetThreadContext failed: " << GetLastError() << endl;
+                    return nullptr;
+                }
+
+                break;
+            }
+            else {
+                cerr << "unexpected exception: exit" << endl;
+                return nullptr;
+            }
+        }
+        else if (de.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT) {
+            cerr << "unexpected: process exited" << endl;
+            return nullptr;
+        }
+
+        ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
+    }
+
     auto suspend = process->suspendThread();
+
+    if (state == SUSPEND_ON_ENTRYPOINT) {
+        process->set_at(entrypoint, originChar);
+        process->flush();
+        ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
+    }
     if(!DebugActiveProcessStop(pi.dwProcessId)) {
         cerr << "DebugActiveProcessStop failed: " << GetLastError() << endl;
         return nullptr;
@@ -114,13 +207,13 @@ int main(int argc, char* argv[])
     try {
         result = options.parse(argc, argv);
     } catch (std::exception e) {
-        cout << "bad arguments" << endl;
-        cout << options.help() << endl;
+        std::cout << "bad arguments" << endl;
+        std::cout << options.help() << endl;
         return 1;
     }
 
     if (result.count("help")) {
-        cout << options.help() << endl;
+        std::cout << options.help() << endl;
         return 0;
     }
 
@@ -175,7 +268,7 @@ int main(int argc, char* argv[])
         }
 
         try {
-            suspend_state = CreateProcessAndSuspend(new_process_cmdline, process);
+            suspend_state = CreateProcessAndSuspend(new_process_cmdline, process, SUSPEND_ON_ENTRYPOINT);
         } catch (std::exception& e) {
             cerr << "failed to create process: " << e.what() << endl;
             return  1;
@@ -195,7 +288,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    cout << "resuming target process" << endl;
+    std::cout << "resuming target process" << endl;
     if (!process->resumeThread(std::move(suspend_state))) {
         cerr << "failed to resume target process" << endl;
         return 1;
@@ -203,7 +296,7 @@ int main(int argc, char* argv[])
 
     string outMsg;
     for (;;cin >> outMsg) {
-        cout << "enter 'exit' to exit" << endl;
+        std::cout << "enter 'exit' to exit" << endl;
 
         if (outMsg == "exit")
             break;

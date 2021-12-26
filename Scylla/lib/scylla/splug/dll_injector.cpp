@@ -1,4 +1,5 @@
 #include "scylla/splug/dll_injector.h"
+#include "str_utils.h"
 #include <stdexcept>
 using namespace std;
 using namespace scylla;
@@ -36,7 +37,8 @@ void SPlugDLLInjector::doit(const YAML::Node& node) {
             throw std::runtime_error("SPlugDLLInjector::doit: dll path is empty");
         
         process->inject_dll(path, stealthy);
-        inject_info->dlls.push_back(make_pair(path, exchange));
+        auto mname = canonicalizeModuleName(path);
+        inject_info->dlls.push_back(make_pair(mname, exchange));
     }
 }
 

@@ -5,6 +5,7 @@
 #include "process/memory_map_module.h"
 #include "process/memory_map_section.h"
 #include "process/memory_map_stealthy_module.h"
+#include "str_utils.h"
 #include <stdexcept>
 #include <Windows.h>
 #include <psapi.h>
@@ -346,10 +347,7 @@ void WinProcessNative::clear_modules() {
 }
 
 string WinProcessNative::canonicalize_module_name(const string& name) {
-    string lname = __tolower(name);
-    if (lname.find_last_of('\\') != string::npos)
-        lname = lname.substr(lname.find_last_of('\\') + 1);
-    return lname;
+    return canonicalizeModuleName(name);
 }
 
 shared_ptr<MapPEModule> WinProcessNative::find_module(const string& name) {

@@ -2,6 +2,7 @@
 #include <string>
 #include <cstdio>
 #include <stdarg.h>
+#include <algorithm>
 using namespace std;
 
 
@@ -18,4 +19,15 @@ std::string strformat(const char* fmt, ...) {
     vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
     return string(buf);
+}
+
+string canonicalizeModuleName(string name) {
+    std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+    if (name.find_last_of('\\') != string::npos)
+        name = name.substr(name.find_last_of('\\') + 1);
+
+    if (name.find_last_of('/') != string::npos)
+        name = name.substr(name.find_last_of('/') + 1);
+
+    return name;
 }

@@ -15,8 +15,8 @@ using namespace std;
 #define BUFSIZE (1 << 16)
 static WSADATA wsaData;
 
-UDPLogServer::UDPLogServer(uint16_t udpPort, uint32_t addr):
-    m_port(udpPort), m_addr(addr),
+UDPLogServer::UDPLogServer(uint16_t n_udpPort, uint32_t n_addr):
+    m_port(n_udpPort), m_addr(n_addr),
     m_socket(nullptr, [](int* fd) {})
 {
     this->m_run = false;

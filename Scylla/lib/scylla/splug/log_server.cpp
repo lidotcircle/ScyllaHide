@@ -45,7 +45,7 @@ void SPlugLogServer::doit(const YAML::Node& node) {
         addr_str = "127.0.0.1";
 
     auto addr = resolve_dot_ipv4(addr_str);
-    auto server = make_unique<UDPConsoleLogServer>(port, addr);
+    auto server = make_unique<UDPConsoleLogServer>(htons(port), htonl(addr));
 
     auto ctx = this->context();
     auto exch = ctx->exchange();

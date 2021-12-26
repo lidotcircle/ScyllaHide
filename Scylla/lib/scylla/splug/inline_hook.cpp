@@ -50,6 +50,9 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
     if (!node.IsMap())
         throw runtime_error("inline hook rule should be a map");
 
+    if (node["disable"].as<bool>(false))
+        return;
+
     auto ctx = this->context();
     auto process = ctx->process();
 

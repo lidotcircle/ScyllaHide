@@ -1,4 +1,5 @@
 #include "process/map_pe_module.h"
+#include "process/memory_map_pefile.h"
 #include "scylla/charybdis.h"
 #include <iostream>
 #include <string>
@@ -24,25 +25,22 @@ static suspend_t CreateProcessAndSuspend(const string& cmdline, shared_ptr<WinPr
         cerr << "CreateProcess failed: " << GetLastError() << endl;
         return nullptr;
     }
-    process = make_shared<WinProcessNative>(pi.dwProcessId);
-    auto ms = process->get_modules();
-    if (ms.size() != 1) {
-        cerr << "Expected 1 module, got " << ms.size() << endl;
+    char imageName[MAX_PATH];
+    auto pathLen = GetModuleFileNameEx(pi.hProcess, nullptr, imageName, MAX_PATH);
+    if (pathLen == 0) {
+        cerr << "GetProcessImageFileName failed: " << GetLastError() << endl;
         return nullptr;
     }
-    auto mainmod = process->find_module(ms[0]);
-    if (!mainmod) {
-        cerr << "Failed to find main module" << endl;
-        return nullptr;
-    }
-
-    auto imports = mainmod->imports();
+    const auto imagePath = string(imageName, pathLen);
+    auto mainmod = MemoryMapPEFile(imagePath);
+    auto imports = mainmod.imports();
     set<string> require_dlls;
     for (auto& i : imports) {
         auto name = i.first;
         if (name.find_last_of('\\') != string::npos)
             name = name.substr(name.find_last_of('\\') + 1);
 
+        std::transform(name.begin(), name.end(), name.begin(), ::tolower);
         require_dlls.insert(name);
     }
     /*
@@ -63,6 +61,7 @@ static suspend_t CreateProcessAndSuspend(const string& cmdline, shared_ptr<WinPr
             if (filename.find_last_of('\\') != string::npos)
                 filename = filename.substr(filename.find_last_of('\\') + 1);
 
+            transform(filename.begin(), filename.end(), filename.begin(), ::tolower);
             if (filename.empty()) {
                 cerr << "Failed to get filename from file handle" << endl;
                 return nullptr;
@@ -83,6 +82,7 @@ static suspend_t CreateProcessAndSuspend(const string& cmdline, shared_ptr<WinPr
         ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
     }
 
+    process = make_shared<WinProcessNative>(pi.dwProcessId);
     auto suspend = process->suspendThread();
     if(!DebugActiveProcessStop(pi.dwProcessId)) {
         cerr << "DebugActiveProcessStop failed: " << GetLastError() << endl;
@@ -149,7 +149,13 @@ int main(int argc, char* argv[])
     std::shared_ptr<WinProcessNative> process;
     suspend_t suspend_state;
     if (pid > 0) {
-        process = std::make_shared<WinProcessNative>(pid);
+        try {
+            process = std::make_shared<WinProcessNative>(pid);
+        } catch (std::exception& e) {
+            cerr << "failed to get process " << pid << ": " << e.what() << endl;
+            return 1;
+        }
+        
         suspend_state = process->suspendThread();
         if (!suspend_state) {
             cerr << "failed to suspend target process" << endl;
@@ -168,7 +174,13 @@ int main(int argc, char* argv[])
             return 1;
         }
 
-        suspend_state = CreateProcessAndSuspend(new_process_cmdline, process);
+        try {
+            suspend_state = CreateProcessAndSuspend(new_process_cmdline, process);
+        } catch (std::exception& e) {
+            cerr << "failed to create process: " << e.what() << endl;
+            return  1;
+        }
+
         if (!suspend_state) {
             cerr << "failed to create new process" << endl;
             return 1;
@@ -180,6 +192,12 @@ int main(int argc, char* argv[])
         charybdis.doit_file(yaml_config);
     } catch (std::exception& e) {
         cerr << "failed to loading config: " << e.what() << endl;
+        return 1;
+    }
+
+    cout << "resuming target process" << endl;
+    if (!process->resumeThread(std::move(suspend_state))) {
+        cerr << "failed to resume target process" << endl;
         return 1;
     }
 

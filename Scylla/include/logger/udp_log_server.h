@@ -14,7 +14,7 @@ private:
     uint32_t m_addr;
 
 public:
-    UDPLogServer(uint16_t port = 0, uint32_t addr = 0x0100007F);
+    UDPLogServer(uint16_t n_port, uint32_t n_addr);
 
     uint32_t GetAddr();
     uint16_t GetPort();

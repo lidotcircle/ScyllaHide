@@ -11,3 +11,8 @@ target_link_libraries(scylla PUBLIC pe-parser-static)
 target_link_libraries(scylla PUBLIC printf)
 target_link_libraries(scylla PUBLIC yaml-cpp::yaml-cpp)
 target_compile_definitions(scylla PUBLIC YAML_CPP_STATIC_DEFINE=1)
+
+set(scylla_conf_file ${CMAKE_CURRENT_LIST_DIR}/scylla.yaml)
+add_custom_target(scylla_conf ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${scylla_conf_file} ${CMAKE_BINARY_DIR})

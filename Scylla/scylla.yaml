@@ -1,0 +1,20 @@
+
+disable: false
+
+logger:
+  disable: false
+  udp_addr: localhost
+  udp_port: 0
+
+dllInjector:
+  - path: "HookLibrary/HookLibraryx86.dll"
+    stealthy: false
+    exchange: exchange_data
+
+inlineHook:
+  disable: true
+
+keyValue:
+  hello: world
+
+exchange: true

@@ -16,7 +16,7 @@ MemoryMapPEFile::MemoryMapPEFile(const string& filename) {
     ifstream file(filename, ios::binary | ios::ate);
 
     if (!file.is_open())
-        throw runtime_error("Failed to open file");
+        throw runtime_error("Failed to open file: " + filename);
 
     size_t size = file.tellg();
     file.seekg(0, ios::beg);

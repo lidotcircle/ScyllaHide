@@ -10,3 +10,6 @@
 [submodule "3rdparty/printf"]
 	path = 3rdparty/printf
 	url = https://github.com/mpaland/printf
+[submodule "3rdparty/imgui"]
+	path = 3rdparty/imgui
+	url = https://github.com/ocornut/imgui

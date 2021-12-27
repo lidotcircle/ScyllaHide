@@ -20,6 +20,9 @@ target_include_directories(cxxopts INTERFACE ${CMAKE_CURRENT_LIST_DIR}/cxxopts/i
 add_subdirectory(yaml-cpp)
 
 
+include(${CMAKE_CURRENT_LIST_DIR}/dearIMGUI.cmake)
+
+
 add_library(printf STATIC ${CMAKE_CURRENT_LIST_DIR}/printf/printf.c)
 target_include_directories(printf PUBLIC ${CMAKE_CURRENT_LIST_DIR}/printf)
 

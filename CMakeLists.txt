@@ -26,4 +26,8 @@ add_subdirectory("3rdparty")
 add_subdirectory("Scylla")
 add_subdirectory("HookLibrary")
 add_subdirectory("InjectorCLI")
+
+add_subdirectory("ScyllaGUI")
+add_subdirectory("ScyllaStandalone")
+
 add_subdirectory("ScyllaTest")

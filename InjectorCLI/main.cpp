@@ -116,8 +116,6 @@ static suspend_t CreateProcessAndSuspend(const string& cmdline, shared_ptr<WinPr
         process->set_at(entrypoint, '\xcc');
         process->flush();
         ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
-
-        std::cout << "EP: 0x" << std::hex << entrypoint << std::dec << endl;
     }
 
     while (state == SUSPEND_ON_ENTRYPOINT) {
@@ -136,21 +134,31 @@ static suspend_t CreateProcessAndSuspend(const string& cmdline, shared_ptr<WinPr
                 }
                 auto d1 = defer([&]() { CloseHandle(thandle); });
 
-                CONTEXT ctx = { 0 };
-                if (!GetThreadContext(thandle, &ctx)) {
+                PCONTEXT pctx = nullptr;
+                DWORD ctxSize = 0;
+                if (InitializeContext(nullptr, CONTEXT_CONTROL, &pctx, &ctxSize) ||
+                    GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+                {
+                    cerr << "InitializeContext failed, expect insufficent buffer " << GetLastErrorAsString() << endl;
+                    return nullptr;
+                };
+                shared_ptr<char> ctx_buf(new char[ctxSize], std::default_delete<char[]>());
+                if (!InitializeContext(ctx_buf.get(), CONTEXT_CONTROL, &pctx, &ctxSize)) {
+                    cerr << "InitializeContext failed: " << GetLastErrorAsString() << endl;
+                    return nullptr;
+                }
+                if (!GetThreadContext(thandle, pctx)) {
                     cerr << "GetThreadContext failed: " << GetLastError() << endl;
                     return nullptr;
                 }
 
-cout << "ctx.Eip: " << std::hex << ctx.Eip << std::dec << endl;
 #ifdef _WIN64
-                ctx.Rip--;
+                pctx->Rip--;
 #else
-                ctx.Eip--;
+                pctx->Eip--;
 #endif 
                 
-                cout << "  set eip to " << std::hex << ctx.Eip << std::dec << endl;
-                if (!SetThreadContext(thandle, &ctx)) {
+                if (!SetThreadContext(thandle, pctx)) {
                     cerr << "SetThreadContext failed: " << GetLastError() << endl;
                     return nullptr;
                 }
@@ -295,11 +303,8 @@ int main(int argc, char* argv[])
     }
 
     string outMsg;
-    for (;;cin >> outMsg) {
-        std::cout << "enter 'exit' to exit" << endl;
-
-        if (outMsg == "exit")
-            break;
-    }
+    do {
+        std::cout << "ENTER 'exit' TO EXIT" << endl;
+    } while ((cin >> outMsg), !cin.fail() && outMsg != "exit");
     return 0;
 }

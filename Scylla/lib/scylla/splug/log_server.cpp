@@ -57,7 +57,7 @@ void SPlugLogServer::doit(const YAML::Node& node) {
     auto server = make_unique<UDPConsoleLogServer>(htons(port), htonl(addr));
 
     auto ctx = this->context();
-    auto exch = ctx->exchange();
+    auto& exch = ctx->exchange();
     exch.set_udp_port(server->GetPort());
     exch.set_udp_addr(server->GetAddr());
     this->m_log_server = move(server);

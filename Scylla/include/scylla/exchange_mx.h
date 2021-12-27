@@ -24,6 +24,8 @@ private:
 
 public:
     ExchangeDataMX(WinProcess_t process);
+    ExchangeDataMX(const ExchangeDataMX&) = delete;
+    ExchangeDataMX& operator=(const ExchangeDataMX&) = delete;
 
     void set_udp_port(uint16_t port);
     void set_udp_addr(uint32_t addr);

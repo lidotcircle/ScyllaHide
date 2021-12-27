@@ -12,7 +12,9 @@ dllInjector:
     exchange: exchange_data
 
 inlineHook:
-  disable: true
+  disable: false
+  ntdll.dll:
+    NtWriteVirtualMemory: HookLibraryx86.dll::_HookedNtWriteVirtualMemory@.*
 
 keyValue:
   hello: world

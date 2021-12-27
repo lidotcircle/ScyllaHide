@@ -86,7 +86,7 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
             addr = rmod->baseaddr() + rva;
             func = truefunc;
         } else {
-            throw runtime_error("invalid inline hook target");
+            throw runtime_error("invalid inline hook target '" + expr + "'");
         }
 
         return make_tuple(addr, mod, func);
@@ -108,6 +108,9 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
         auto& val = it->second;
 
         auto str = key.as<string>();
+        if (str == "disable")
+            continue;
+
         if (val.IsMap()) {
             for (auto it=val.begin();it!=val.end();it++) {
                 string kn = str;
@@ -128,7 +131,7 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
         }
     }
 
-    auto exch = ctx->exchange();
+    auto& exch = ctx->exchange();
     for (auto& hook: hooks) {
         auto original_addr = get<0>(hook);
         auto hook_addr     = get<1>(hook);
@@ -143,7 +146,7 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
 
 void SPlugInlineHook::undo() {
     auto ctx = this->context();
-    auto exch = ctx->exchange();
+    auto& exch = ctx->exchange();
     auto process = ctx->process();
 
     for (auto& hk : _hooks) {

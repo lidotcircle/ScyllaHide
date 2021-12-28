@@ -2,14 +2,15 @@
 #define _SCYLLA_GUI_SPLUG_LOG_SERVER_H_
 
 #include "../yaml_node.h"
+#include <memory>
 
 
 class GuiSplugLogServer : public GuiYamlNode
 {
 private:
-    bool m_enalbe;
+    bool m_enable;
     int m_port;
-    std::string m_addr;
+    std::shared_ptr<char> m_addr;
 
 public:
     GuiSplugLogServer(const YAML::Node& node);

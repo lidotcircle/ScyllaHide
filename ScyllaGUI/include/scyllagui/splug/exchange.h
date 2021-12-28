@@ -7,7 +7,7 @@
 class GuiSplugExchange : public GuiYamlNode
 {
 private:
-    std::vector<std::pair<std::string,std::string>> m_exchange;
+    bool enable_exchange;
     
 public:
     GuiSplugExchange(const YAML::Node& node);

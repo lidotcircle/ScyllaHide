@@ -10,6 +10,8 @@ private:
     bool m_visible;
 
 public:
+    GuiYamlNode();
+
     virtual YAML::Node getNode() = 0;
 
     virtual bool show() = 0;

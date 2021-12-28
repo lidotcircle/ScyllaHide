@@ -26,6 +26,7 @@ bool GuiYamlMap::show() {
 
         if (ImGui::CollapsingHeader(title.c_str())) {
             child->show();
+            ImGui::Spacing();
         }
     }
 

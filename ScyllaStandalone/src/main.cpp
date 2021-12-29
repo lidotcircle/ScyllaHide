@@ -4,6 +4,7 @@
 #include "scyllagui/imgui_app.h"
 #include "scyllagui/splug/splug_view.h"
 #include "scylla/utils.h"
+#include "scylla/charybdis.h"
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -36,12 +37,20 @@ private:
     int m_prev_pid;
     string process_name_by_pid;
 
+    bool m_injected;
+    int  m_injected_pid;
+    shared_ptr<WinProcessNative> m_process;
+    unique_ptr<scylla::Charybdis> m_charybdis;
+
     void child_window_control();
     void new_process_widget();
     void process_name_widget();
     void process_id_widget();
 
     void log_window();
+
+    bool inject_process();
+    void undo_inject();
 
 protected:
     virtual int render_frame() override;
@@ -63,6 +72,9 @@ public:
  
         this->m_recieve_log = true;
         this->m_show_log_window = false;
+
+        this->m_injected = false;
+        this->m_injected_pid = 0;
 
         try {
             YAML::Node node;
@@ -220,11 +232,17 @@ void ScyllaAPP::child_window_control()
     ImGui::Spacing();
 
     if (ImGui::Button("Start")) {
+        this->m_injected = this->inject_process();
     }
 
+    if (!this->m_injected)
+        ImGui::BeginDisabled();
     ImGui::SameLine();
     if (ImGui::Button("Undo")) {
+        this->undo_inject();
     }
+    if (!this->m_injected)
+        ImGui::EndDisabled();
 
     ImGui::SameLine();
     ImGui::Checkbox("Show Log Window", &m_show_log_window);
@@ -293,6 +311,13 @@ void ScyllaAPP::log_window() {
             ImGui::Spacing();
         }
     }
+}
+
+bool ScyllaAPP::inject_process() {
+    return false;
+}
+
+void ScyllaAPP::undo_inject() {
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)

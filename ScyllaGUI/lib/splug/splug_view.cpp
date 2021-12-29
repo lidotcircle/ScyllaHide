@@ -10,12 +10,21 @@ using namespace std;
 
 GuiSplugView::GuiSplugView(const YAML::Node& node)
 {
-    if (!node.IsMap())
+    YAML::Node _node;
+
+    if (node.IsNull()) {
+        YAML::Node ep;
+        _node["__"] = ep;
+    } else {
+        _node = node;
+    }
+
+    if (!_node.IsMap())
         throw runtime_error("GuiSplugView: node is not a map");
 
-    this->add_child("dllInjector", "DLL Injection", make_unique<GuiSplugDllInjector>(node["dllInjector"]));
-    this->add_child("inlineHook", "Inline Hook", make_unique<GuiSplugInlineHook>(node["inlineHook"]));
-    this->add_child("keyValue", "Key Value", make_unique<GuiSplugKeyValue>(node["keyValue"]));
-    this->add_child("exchange", "Exchange", make_unique<GuiSplugExchange>(node["exchange"]));
-    this->add_child("logger", "Logger", make_unique<GuiSplugLogServer>(node["logger"]));
+    this->add_child("dllInjector", "DLL Injection", make_unique<GuiSplugDllInjector>(_node["dllInjector"]));
+    this->add_child("inlineHook", "Inline Hook", make_unique<GuiSplugInlineHook>(_node["inlineHook"]));
+    this->add_child("keyValue", "Key Value", make_unique<GuiSplugKeyValue>(_node["keyValue"]));
+    this->add_child("exchange", "Exchange", make_unique<GuiSplugExchange>(_node["exchange"]));
+    this->add_child("logger", "Logger", make_unique<GuiSplugLogServer>(_node["logger"]));
 }

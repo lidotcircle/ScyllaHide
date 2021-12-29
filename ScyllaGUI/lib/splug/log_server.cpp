@@ -7,11 +7,11 @@ using namespace std;
 
 GuiSplugLogServer::GuiSplugLogServer(const YAML::Node& node)
 {
-    m_enable = !node["disable"].as<bool>();
-    m_port = node["udp_port"].as<uint16_t>();
+    m_enable = !node["disable"].as<bool>(false);
+    m_port = node["udp_port"].as<uint16_t>(0);
 
     this->m_addr = shared_ptr<char>(new char[MAX_ADDR_LEN], std::default_delete<char[]>());
-    string str = node["udp_addr"].as<std::string>();
+    string str = node["udp_addr"].as<std::string>("localhost");
     strncpy(this->m_addr.get(), str.c_str(), MAX_ADDR_LEN);
 }
 

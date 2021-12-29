@@ -5,6 +5,7 @@
 #include <map>
 #include <string>
 #include "./exchange_mx.h"
+#include "./splug_config.h"
 
 class WinProcessNative;
 
@@ -21,6 +22,7 @@ public:
 class ScyllaContextBase {
 private:
     std::shared_ptr<WinProcessNative> m_process;
+    std::shared_ptr<SPlugConfig> m_splug_config;
     ExchangeDataMX m_exchange;
     std::map<std::string, std::shared_ptr<ScyllaContextItem>> m_items;
 
@@ -33,6 +35,10 @@ public:
 
     ExchangeDataMX& exchange();
     const ExchangeDataMX& exchange() const;
+
+    std::shared_ptr<SPlugConfig> splug_config();
+    const std::shared_ptr<SPlugConfig> splug_config() const;
+    void set_splug_config(std::shared_ptr<SPlugConfig> config);
 
     void add_item(const std::string& name, std::shared_ptr<ScyllaContextItem> item);
     void remove_item(const std::string& name);

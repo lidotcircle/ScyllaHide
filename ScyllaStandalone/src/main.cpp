@@ -3,65 +3,117 @@
 #include "imgui.h"
 #include "scyllagui/imgui_app.h"
 #include "scyllagui/splug/splug_view.h"
+#include "scylla/utils.h"
+#include <fstream>
+#include <sstream>
 #include <string>
 using namespace std;
 
-static const char* ChooserFile(const char* filter) 
-{
-    static char syFile[MAX_PATH];
-    size_t convertedChars = 0;
-    OPENFILENAME sfn;
+#define MAX_CMDLINE_ARGS_LEN 1024
 
-    ZeroMemory( &sfn , sizeof( sfn));
-    sfn.lStructSize = sizeof ( sfn );
-    sfn.hwndOwner = NULL ;
-    sfn.lpstrFile = syFile ;
-    sfn.lpstrFile[0] = '\0';
-    sfn.nMaxFile = sizeof( syFile );
-    sfn.lpstrFilter = filter;
-    sfn.nFilterIndex =1;
-    sfn.lpstrFileTitle = NULL ;
-    sfn.nMaxFileTitle = 0 ;
-    sfn.lpstrInitialDir=NULL;
-
-    sfn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOVALIDATE | OFN_HIDEREADONLY;
-    if (GetOpenFileName( &sfn ) != TRUE)
-        return nullptr;
-
-    return syFile;
-}
 
 class ScyllaAPP: public ImGuiAPP
 {
 private:
     unique_ptr<GuiSplugView> m_splugView;
+    string m_fileName;
+
+    enum RunningMode {
+        RunningMode_CMDLine = 0,
+        RunningMode_ProcessName,
+        RunningMode_PID,
+    } m_mode;
+
+    vector<string> m_logs;
+    bool m_recieve_log;
+    bool m_show_log_window;
+
+    std::shared_ptr<char> m_executable;
+    std::shared_ptr<char> m_cmdline;
+    std::shared_ptr<char> m_process_name;
+    bool m_pid_resolved_by_process_name;
+    int m_pid;
+    int m_prev_pid;
+    string process_name_by_pid;
+
+    void child_window_control();
+    void new_process_widget();
+    void process_name_widget();
+    void process_id_widget();
+
+    void log_window();
 
 protected:
     virtual int render_frame() override;
 
 public:
-    ScyllaAPP(): ImGuiAPP("Scylla Monitor") {
+    ScyllaAPP(): ImGuiAPP("Scylla Monitor", 500, 700) {
+        if (ifstream("scylla.yaml")) {
+            m_fileName = "scylla.yaml";
+        }
+
+        this->m_mode = RunningMode_CMDLine;
+        m_executable = shared_ptr<char>(new char[MAX_PATH], std::default_delete<char[]>());
+        m_executable.get()[0] = '\0';
+        m_cmdline = shared_ptr<char>(new char[MAX_CMDLINE_ARGS_LEN], std::default_delete<char[]>());
+        m_cmdline.get()[0] = '\0';
+        m_process_name = shared_ptr<char>(new char[MAX_PATH], std::default_delete<char[]>());
+        m_process_name.get()[0] = '\0';
+        this->m_pid = 0;
+ 
+        this->m_recieve_log = true;
+        this->m_show_log_window = false;
+
         try {
-        auto node = YAML::LoadFile("scylla.yaml");
-        this->m_splugView = make_unique<GuiSplugView>(node);
+            YAML::Node node;
+            if (!m_fileName.empty())
+                node = YAML::LoadFile(m_fileName);
+            this->m_splugView = make_unique<GuiSplugView>(node);
         } catch (exception& e) {
             MessageBox(NULL, e.what(), "Error", MB_OK);
         }
     }
+
+    void openFile(const string& filename) {
+        try {
+            auto node = YAML::LoadFile(filename);
+            this->m_splugView = make_unique<GuiSplugView>(node);
+            this->m_fileName = filename;
+        } catch (exception& e) {
+            MessageBox(NULL, e.what(), "Error", MB_OK);
+        }
+    }
+
+    string dump() {
+        stringstream ss;
+        auto node = this->m_splugView->getNode();
+        ss << node;
+        return ss.str();
+    }
+
+    void saveFile(const string& filename) {
+        ofstream outfile(filename);
+        if (!outfile.is_open()) {
+            string err ="Failed to open file '" + filename + "'";
+            MessageBoxA(NULL, err.c_str(), "Error", MB_OK);
+            return;
+        }
+
+        outfile << this->m_splugView->getNode();
+        this->m_fileName = filename;
+    }
+
+    void saveFile() {
+        if (this->m_fileName.empty())
+            throw runtime_error("No file to save");
+        this->saveFile(this->m_fileName);
+    }
 };
 
 int ScyllaAPP::render_frame() {
-    static bool show_demo_window = true;
-    static bool show_another_window = false;
-    static float clear_color[4];
-
     auto& io = ImGui::GetIO();
     ImGui::SetNextWindowPos( ImVec2(0,0) );
     ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x, io.DisplaySize.y));
-
-    bool b_openfile = false;
-    bool b_savefile = false;
-    bool b_saveas   = false;
 
     if (ImGui::Begin("MainWindow" , nullptr , 
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
@@ -74,15 +126,24 @@ int ScyllaAPP::render_frame() {
         {
             if (ImGui::Button("Open")) {
                 auto file = ChooserFile("YAML (*.yaml)\0*.yaml\0ALL Files (*.*)\0*.*\0");
-                b_openfile = true;
+                if (file != nullptr)
+                    this->openFile(file);
             }
             ImGui::SameLine();
             if (ImGui::Button("Save")) {
-                b_savefile = true;
+                if (!this->m_fileName.empty()) {
+                    this->saveFile();
+                } else {
+                    auto file = SaveFileTo("YAML (*.yaml)\0*.yaml\0ALL Files (*.*)\0*.*\0", "scylla.yaml");
+                    if (file != nullptr)
+                        this->saveFile(file);
+                }
             }
             ImGui::SameLine();
             if (ImGui::Button("Save As")) {
-                b_saveas = true;
+                auto file = SaveFileTo("YAML (*.yaml)\0*.yaml\0ALL Files (*.*)\0*.*\0", "scylla.yaml");
+                if (file != nullptr)
+                    this->saveFile(file);
             }
             ImGui::EndChild();
         }
@@ -92,52 +153,146 @@ int ScyllaAPP::render_frame() {
         ImGui::Spacing();
         ImGui::Spacing();
 
-        if (ImGui::BeginChild("config", ImVec2(0, 0), false)) {
+        auto h = ImGui::GetWindowHeight();
+        if (h > (175 + 30)) {
+            h -= (175 + 30);
+        } else {
+            h = 30;
+        }
+        if (ImGui::BeginChild("config", ImVec2(0, h), false)) {
             this->m_splugView->show();
             ImGui::EndChild();
         }
 
-        ImGui::End();
-    }
+        ImGui::Spacing();
+        if (ImGui::BeginChild("control", ImVec2(0, 0), true)) {
+            this->child_window_control();
+            ImGui::EndChild();
+        }
 
-    // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-    if (show_demo_window)
-        ImGui::ShowDemoWindow(&show_demo_window);
-
-    // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
-    {
-        static float f = 0.0f;
-        static int counter = 0;
-
-        ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-        ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-        ImGui::Checkbox("Demo 打开 Window", &show_demo_window);      // Edit bools storing our window open/close state
-        ImGui::Checkbox("Another Window", &show_another_window);
-
-        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-        ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-        if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-            counter++;
-        ImGui::SameLine();
-        ImGui::Text("counter = %d", counter);
-
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-        ImGui::End();
-    }
-
-    // 3. Show another simple window.
-    if (show_another_window)
-    {
-        ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-        ImGui::Text("Hello from another window!");
-        if (ImGui::Button("Close Me"))
-            show_another_window = false;
+       this->log_window();
+        
         ImGui::End();
     }
 
     return 0;
+}
+
+void ScyllaAPP::child_window_control()
+{
+    static const char* modes[] = {
+        "By Command Line",
+        "By Process Name",
+        "By Process ID"
+    };
+
+    if (ImGui::BeginCombo("Running Mode", modes[m_mode])) {
+        for (int i = 0; i < 3; i++) {
+            const bool is_selected = (i == m_mode);
+            if (ImGui::Selectable(modes[i], is_selected)) {
+                m_mode = static_cast<RunningMode>(i);
+            }
+            if (is_selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    switch (m_mode)
+    {
+    case RunningMode_CMDLine:
+        this->new_process_widget();
+        break;
+    case RunningMode_ProcessName:
+        this->process_name_widget();
+        break;
+    case RunningMode_PID:
+        this->process_id_widget();
+        break;
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    if (ImGui::Button("Start")) {
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Undo")) {
+    }
+
+    ImGui::SameLine();
+    ImGui::Checkbox("Show Log Window", &m_show_log_window);
+
+    ImGui::SameLine();
+    ImGui::Checkbox("Recieve Log", &m_recieve_log);
+}
+
+void ScyllaAPP::new_process_widget() {
+    ImGui::InputText("Executable", m_executable.get(), MAX_PATH);
+    ImGui::SameLine();
+    if (ImGui::Button("...")) {
+        auto file = ChooserFile("Executable (*.exe)\0*.exe\0ALL Files (*.*)\0*.*\0");
+        if (file != nullptr)
+            strncpy(m_executable.get(), file, MAX_PATH);
+    }
+
+    ImGui::InputText("CMDLine Arguments", m_cmdline.get(), MAX_CMDLINE_ARGS_LEN);
+}
+void ScyllaAPP::process_name_widget() {
+    ImGui::InputText("Process Name", m_process_name.get(), MAX_PATH);
+
+    if (ImGui::Button("R")) {
+        string pn(m_process_name.get());
+        auto pid = GetPidByProcessName(pn);
+
+        if (pid > 0) {
+            this->m_pid_resolved_by_process_name = true;
+            this->m_pid = pid;
+        }
+    }
+
+    if (this->m_pid_resolved_by_process_name) {
+        ImGui::SameLine();
+        ImGui::Text("PID: %d", this->m_pid);
+    }
+}
+void ScyllaAPP::process_id_widget() {
+    ImGui::InputInt("Process ID", &this->m_pid);
+
+    if (this->m_pid < 0)
+        this->m_pid = 0;
+
+    if (ImGui::Button("R") && this->m_pid > 0) {
+        auto pn = GetProcessNameByPid(this->m_pid);
+        if (pn != nullptr) {
+            this->process_name_by_pid = pn;
+            this->m_prev_pid = this->m_pid;
+        }
+    }
+
+    if (this->m_prev_pid == this->m_pid && !this->process_name_by_pid.empty()) {
+        ImGui::SameLine();
+        ImGui::Text(this->process_name_by_pid.c_str());
+    }
+}
+
+void ScyllaAPP::log_window() {
+    if (!this->m_show_log_window)
+        return;
+    
+    if (ImGui::Begin("Log", &this->m_show_log_window)) {
+        for (auto& log : this->m_logs) {
+            ImGui::Text(log.c_str());
+            ImGui::Separator();
+            ImGui::Spacing();
+        }
+    }
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)

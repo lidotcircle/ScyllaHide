@@ -9,12 +9,14 @@ class ImGuiAPP
 private:
     bool m_run;
     std::string m_title;
+    float m_default_width;
+    float m_default_height;
 
 protected:
     virtual int render_frame() = 0;
     
 public:
-    ImGuiAPP(std::string title);
+    ImGuiAPP(std::string title, float default_width, float default_height);
 
     void run_loop();
     void stop();

@@ -113,7 +113,10 @@ void ImGuiAPP::run_loop() {
     // ImGui_ImplWin32_EnableDpiAwareness();
     WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, "ImGui APP", NULL };
     ::RegisterClassEx(&wc);
-    HWND hwnd = ::CreateWindow(wc.lpszClassName, this->m_title.c_str(), WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, NULL, NULL, wc.hInstance, NULL);
+    HWND hwnd = ::CreateWindow(
+        wc.lpszClassName, this->m_title.c_str(), WS_OVERLAPPEDWINDOW,
+        100, 100, this->m_default_width, this->m_default_height,
+        NULL, NULL, wc.hInstance, NULL);
 
     // Initialize Direct3D
     if (!CreateDeviceD3D(hwnd))
@@ -198,4 +201,5 @@ void ImGuiAPP::stop() {
     this->m_run = false;
 }
 
-ImGuiAPP::ImGuiAPP(string title): m_title(title) { }
+ImGuiAPP::ImGuiAPP(string title, float default_width, float default_height):
+    m_title(title), m_default_width(default_width), m_default_height(default_height) {}

@@ -3,12 +3,23 @@
 
 #include "../splug.h"
 #include "../context_base.h"
+#include "../splug_config.h"
 #include "../../logger/log_server.h"
 #include <memory>
 #include <thread>
+#include <functional>
 
 
 namespace scylla {
+
+struct LogServerConfig: public SPlugConfig {
+    bool is_callback_log_server;
+    std::function<void(const char*, int, void*)> on_log;
+    void* data;
+
+    LogServerConfig();
+};
+
 
 class SPlugLogServer: public SPlug {
 private:

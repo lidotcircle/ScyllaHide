@@ -41,3 +41,13 @@ void Charybdis::doit(const YAML::Node& node) {
 void Charybdis::undo() {
     this->m_splug_manager->undo();
 }
+
+std::shared_ptr<SPlugConfig> Charybdis::get_splug_config() {
+    return this->m_context->splug_config();
+}
+const std::shared_ptr<SPlugConfig> Charybdis::get_splug_config() const {
+    return this->m_context->splug_config();
+}
+void Charybdis::set_splug_config(std::shared_ptr<SPlugConfig> config) {
+    this->m_context->set_splug_config(config);
+}

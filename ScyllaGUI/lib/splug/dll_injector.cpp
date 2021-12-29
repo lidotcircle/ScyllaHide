@@ -13,7 +13,7 @@ static string string_trim(string str)
 }
 
 GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node) {
-    if (!node.IsSequence() && !node.IsNull())
+    if (!node.IsSequence() && node.IsDefined())
         throw std::runtime_error("GuiSplugDllInjector: node is not a sequence");
 
     for (size_t i=0;i<node.size();i++) {

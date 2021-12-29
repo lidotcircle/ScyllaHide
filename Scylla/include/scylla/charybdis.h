@@ -4,6 +4,7 @@
 #include "./splug_manager.h"
 #include "./context_base.h"
 #include "./process/win_process_native.h"
+#include "./splug_config.h"
 
 
 namespace scylla {
@@ -21,6 +22,10 @@ public:
     void doit(const YAML::Node& node);
 
     void undo();
+
+    std::shared_ptr<SPlugConfig> get_splug_config();
+    const std::shared_ptr<SPlugConfig> get_splug_config() const;
+    void set_splug_config(std::shared_ptr<SPlugConfig> confit);
 };
 
 } // namespace scylla

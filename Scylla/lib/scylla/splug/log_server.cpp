@@ -1,5 +1,6 @@
 #include "scylla/splug/log_server.h"
 #include "logger/udp_console_log_server.h"
+#include "logger/udp_callback_log_server.h"
 #include <stdexcept>
 #include <thread>
 #include <iostream>
@@ -29,6 +30,13 @@ static uint32_t resolve_dot_ipv4(const string& dotip) {
 
 namespace scylla {
 
+LogServerConfig::LogServerConfig()
+    : is_callback_log_server(false)
+    , on_log(nullptr)
+    , data(nullptr)
+{
+}
+
 SPlugLogServer::SPlugLogServer(ScyllaContextPtr context) : SPlug(context) {}
 
 SPlugLogServer::~SPlugLogServer() {
@@ -48,16 +56,25 @@ void SPlugLogServer::doit(const YAML::Node& node) {
     if (node["disable"].as<bool>(false))
         return;
 
+    auto ctx = this->context();
+    auto& exch = ctx->exchange();
+    auto config = ctx->splug_config();
+    auto _lconfig = config->get("logger");
+    auto lconfig = dynamic_pointer_cast<LogServerConfig>(_lconfig);
+
     auto port     = node["udp_port"].as<uint16_t>(0);
     auto addr_str = node["udp_addr"].as<string>("localhost");
     if (addr_str == "localhost")
         addr_str = "127.0.0.1";
-
     auto addr = resolve_dot_ipv4(addr_str);
-    auto server = make_unique<UDPConsoleLogServer>(htons(port), htonl(addr));
 
-    auto ctx = this->context();
-    auto& exch = ctx->exchange();
+    unique_ptr<UDPLogServer> server;
+    if (lconfig == nullptr || !lconfig->is_callback_log_server) {
+        server = make_unique<UDPConsoleLogServer>(htons(port), htonl(addr));
+    } else {
+        server = make_unique<UDPCallbackLogServer>(htons(port), htonl(addr), lconfig->on_log, lconfig->data);
+    }
+
     exch.set_udp_port(server->GetPort());
     exch.set_udp_addr(server->GetAddr());
     this->m_log_server = move(server);

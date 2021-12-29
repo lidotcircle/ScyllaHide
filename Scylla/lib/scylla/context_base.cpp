@@ -11,6 +11,7 @@ ScyllaContextItem::~ScyllaContextItem() {}
 ScyllaContextBase::ScyllaContextBase(std::shared_ptr<WinProcessNative> process)
     : m_process(process)
     , m_exchange(process)
+    , m_splug_config(make_shared<SPlugConfig>())
 {
 }
 
@@ -26,6 +27,18 @@ ExchangeDataMX& ScyllaContextBase::exchange() {
 }
 const ExchangeDataMX& ScyllaContextBase::exchange() const {
     return m_exchange;
+}
+
+std::shared_ptr<SPlugConfig> ScyllaContextBase::splug_config() {
+    return m_splug_config;
+}
+const std::shared_ptr<SPlugConfig> ScyllaContextBase::splug_config() const {
+    return m_splug_config;
+}
+void ScyllaContextBase::set_splug_config(std::shared_ptr<SPlugConfig> config) {
+    if (config == nullptr)
+        throw invalid_argument("config is null");
+    m_splug_config = config;
 }
 
 void ScyllaContextBase::add_item(const string& name, std::shared_ptr<ScyllaContextItem> item) {

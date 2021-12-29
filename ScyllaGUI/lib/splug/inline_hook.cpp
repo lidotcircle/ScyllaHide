@@ -7,7 +7,7 @@ using namespace std;
 
 
 GuiSplugInlineHook::GuiSplugInlineHook(const YAML::Node& node) {
-    if (!node.IsMap() && node.IsNull())
+    if (!node.IsMap() && node.IsDefined())
         throw runtime_error("GuiSplugInlineHook: node is not a map");
 
     this->m_enable = !node["disable"].as<bool>(false);

@@ -6,7 +6,7 @@
 
 
 class LogClient {
-private:
+protected:
     void send_var(const char* prefix, const char* fmt, va_list args);
 
 public:

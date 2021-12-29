@@ -5,6 +5,8 @@
 #include "scyllagui/splug/splug_view.h"
 #include "scylla/utils.h"
 #include "scylla/charybdis.h"
+#include "logger/log_client.h"
+#include <chrono>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -13,7 +15,7 @@ using namespace std;
 #define MAX_CMDLINE_ARGS_LEN 1024
 
 
-class ScyllaAPP: public ImGuiAPP
+class ScyllaAPP: public ImGuiAPP, protected LogClient
 {
 private:
     unique_ptr<GuiSplugView> m_splugView;
@@ -42,6 +44,15 @@ private:
     shared_ptr<WinProcessNative> m_process;
     unique_ptr<scylla::Charybdis> m_charybdis;
 
+    string m_log_msg;
+    std::chrono::system_clock::time_point m_log_prev_timestamp;
+    enum {
+        Log_None,
+        Log_Info,
+        Log_Warning,
+        Log_Error,
+    } m_log_level;
+
     void child_window_control();
     void new_process_widget();
     void process_name_widget();
@@ -52,8 +63,14 @@ private:
     bool inject_process();
     void undo_inject();
 
+    void log_display_line();
+
 protected:
     virtual int render_frame() override;
+    virtual void send(const char* buf, uint16_t bufsize) override;
+    void info(const char* fmt, ...);
+    void warn(const char* fmt, ...);
+    void error(const char* fmt, ...);
 
 public:
     ScyllaAPP(): ImGuiAPP("Scylla Monitor", 500, 700) {
@@ -166,8 +183,8 @@ int ScyllaAPP::render_frame() {
         ImGui::Spacing();
 
         auto h = ImGui::GetWindowHeight();
-        if (h > (175 + 30)) {
-            h -= (175 + 30);
+        if (h > (210 + 30)) {
+            h -= (210 + 30);
         } else {
             h = 30;
         }
@@ -175,6 +192,8 @@ int ScyllaAPP::render_frame() {
             this->m_splugView->show();
             ImGui::EndChild();
         }
+
+        this->log_display_line();
 
         ImGui::Spacing();
         if (ImGui::BeginChild("control", ImVec2(0, 0), true)) {
@@ -291,6 +310,8 @@ void ScyllaAPP::process_id_widget() {
         if (pn != nullptr) {
             this->process_name_by_pid = pn;
             this->m_prev_pid = this->m_pid;
+        } else {
+            this->warn("Process ID %d not found", this->m_pid);
         }
     }
 
@@ -314,10 +335,110 @@ void ScyllaAPP::log_window() {
 }
 
 bool ScyllaAPP::inject_process() {
-    return false;
+    WinProcessNative::suspend_t suspend_state;
+
+    if (!this->m_process) {
+        if (this->m_mode == RunningMode_CMDLine) {
+            string _exe(m_executable.get());
+            string _cmdline(m_cmdline.get());
+            suspend_state = CreateProcessAndSuspend(_exe + " " + _cmdline, this->m_process, SUSPEND_ON_ENTRYPOINT);
+
+            if (!suspend_state) {
+                this->warn("Failed to create process and suspend it");
+                return false;
+            }
+        } else if (this->m_mode == RunningMode_ProcessName) {
+            this->m_pid = GetPidByProcessName(this->m_process_name.get());
+
+            if (this->m_pid == 0) {
+                this->warn("Process %s not found", this->m_process_name.get());
+                return false;
+            }
+        } else if (this->m_mode == RunningMode_PID) {
+            try {
+                this->m_process = make_shared<WinProcessNative>(this->m_pid);
+            } catch (const std::exception& e) {
+                this->warn("inject into '%d' failed: %s", this->m_pid, e.what());
+                return false;
+            }
+        }
+    }
+
+    if (!suspend_state) {
+        suspend_state = this->m_process->suspendThread();
+        if (!suspend_state) {
+            this->warn("Failed to suspend process");
+            return false;
+        }
+    }
+
+    try {
+        this->m_charybdis = make_unique<scylla::Charybdis>(this->m_process);
+        auto config = this->m_charybdis->get_splug_config();
+        this->m_charybdis->doit(this->m_splugView->getNode());
+        return true;
+    } catch (const std::exception& e) {
+        this->warn("Failed to create Charybdis: %s", e.what());
+        return false;
+    }
 }
 
 void ScyllaAPP::undo_inject() {
+}
+
+void ScyllaAPP::send(const char* msg, uint16_t len) {
+    this->m_log_msg = string(msg, len);
+    this->m_log_prev_timestamp = std::chrono::system_clock::now();
+}
+
+void ScyllaAPP::info(const char* msg, ...) {
+    this->m_log_level = Log_Info;
+    va_list args;
+    va_start(args, msg);
+    this->send_var("", msg, args);
+    va_end(args);
+}
+void ScyllaAPP::warn(const char* msg, ...) {
+    this->m_log_level = Log_Warning;
+    va_list args;
+    va_start(args, msg);
+    this->send_var("", msg, args);
+    va_end(args);
+}
+void ScyllaAPP::error(const char* msg, ...) {
+    this->m_log_level = Log_Error;
+    va_list args;
+    va_start(args, msg);
+    this->send_var("", msg, args);
+    va_end(args);
+}
+
+void ScyllaAPP::log_display_line() {
+    auto now = std::chrono::system_clock::now();
+    auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - this->m_log_prev_timestamp).count();
+    if (diff > 5000) {
+        ImGui::Spacing();
+        ImGui::Spacing();
+        ImGui::Text("");
+    } else {
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        bool need_pop_color = true;
+        if (this->m_log_level == Log_Info) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
+        } else if (this->m_log_level == Log_Warning) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.0f, 1.0f));
+        } else if (this->m_log_level == Log_Error) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+        } else {
+            need_pop_color = false;
+        }
+        ImGui::Text(this->m_log_msg.c_str());
+        if (need_pop_color)
+            ImGui::PopStyleColor();
+    }
+    ImGui::Spacing();
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)

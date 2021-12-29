@@ -25,7 +25,7 @@ void LogClient::send_var(const char* prefix, const char* fmt, va_list args) {
     strncpy__(buf, prefix, off);
 
     auto n = vsnprintf_(buf + off, sizeof(buf) - off, fmt, args);
-    this->send(buf, n);
+    this->send(buf, n + off);
 }
 
 void LogClient::send(const char* buf, uint16_t bufsize) {

@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "scyllagui/imgui_app.h"
 #include "scyllagui/splug/splug_view.h"
+#include "scylla/splug/log_server.h"
 #include "scylla/utils.h"
 #include "scylla/charybdis.h"
 #include "logger/log_client.h"
@@ -74,10 +75,6 @@ protected:
 
 public:
     ScyllaAPP(): ImGuiAPP("Scylla Monitor", 500, 700) {
-        if (ifstream("scylla.yaml")) {
-            m_fileName = "scylla.yaml";
-        }
-
         this->m_mode = RunningMode_CMDLine;
         m_executable = shared_ptr<char>(new char[MAX_PATH], std::default_delete<char[]>());
         m_executable.get()[0] = '\0';
@@ -93,13 +90,9 @@ public:
         this->m_injected = false;
         this->m_injected_pid = 0;
 
-        try {
-            YAML::Node node;
-            if (!m_fileName.empty())
-                node = YAML::LoadFile(m_fileName);
-            this->m_splugView = make_unique<GuiSplugView>(node);
-        } catch (exception& e) {
-            MessageBox(NULL, e.what(), "Error", MB_OK);
+        if (ifstream("scylla.yaml")) {
+            m_fileName = "scylla.yaml";
+            this->openFile(this->m_fileName);
         }
     }
 
@@ -108,8 +101,9 @@ public:
             auto node = YAML::LoadFile(filename);
             this->m_splugView = make_unique<GuiSplugView>(node);
             this->m_fileName = filename;
+            this->info("Loaded file: %s", filename.c_str());
         } catch (exception& e) {
-            MessageBox(NULL, e.what(), "Error", MB_OK);
+            this->error("Load config failed: %s", e.what());
         }
     }
 
@@ -123,18 +117,19 @@ public:
     void saveFile(const string& filename) {
         ofstream outfile(filename);
         if (!outfile.is_open()) {
-            string err ="Failed to open file '" + filename + "'";
-            MessageBoxA(NULL, err.c_str(), "Error", MB_OK);
+            this->error("Failed to open file %s", filename.c_str());
             return;
         }
 
         outfile << this->m_splugView->getNode();
         this->m_fileName = filename;
+        this->info("Saved to '%s'", filename.c_str());
     }
 
     void saveFile() {
         if (this->m_fileName.empty())
-            throw runtime_error("No file to save");
+            this->warn("No file name specified");
+
         this->saveFile(this->m_fileName);
     }
 };
@@ -337,31 +332,32 @@ void ScyllaAPP::log_window() {
 bool ScyllaAPP::inject_process() {
     WinProcessNative::suspend_t suspend_state;
 
-    if (!this->m_process) {
-        if (this->m_mode == RunningMode_CMDLine) {
-            string _exe(m_executable.get());
-            string _cmdline(m_cmdline.get());
-            suspend_state = CreateProcessAndSuspend(_exe + " " + _cmdline, this->m_process, SUSPEND_ON_ENTRYPOINT);
+    if (this->m_mode == RunningMode_CMDLine) {
+        string _exe(m_executable.get());
+        string _cmdline(m_cmdline.get());
+        suspend_state = CreateProcessAndSuspend(_exe + " " + _cmdline, this->m_process, SUSPEND_ON_ENTRYPOINT);
 
-            if (!suspend_state) {
-                this->warn("Failed to create process and suspend it");
-                return false;
-            }
-        } else if (this->m_mode == RunningMode_ProcessName) {
-            this->m_pid = GetPidByProcessName(this->m_process_name.get());
-
-            if (this->m_pid == 0) {
-                this->warn("Process %s not found", this->m_process_name.get());
-                return false;
-            }
-        } else if (this->m_mode == RunningMode_PID) {
-            try {
-                this->m_process = make_shared<WinProcessNative>(this->m_pid);
-            } catch (const std::exception& e) {
-                this->warn("inject into '%d' failed: %s", this->m_pid, e.what());
-                return false;
-            }
+        if (!suspend_state) {
+            this->warn("Failed to create process and suspend it");
+            return false;
         }
+    } else if (this->m_mode == RunningMode_ProcessName) {
+        this->m_pid = GetPidByProcessName(this->m_process_name.get());
+
+        if (this->m_pid == 0) {
+            this->warn("Process %s not found", this->m_process_name.get());
+            return false;
+        }
+    } else if (this->m_mode == RunningMode_PID) {
+        try {
+            this->m_process = make_shared<WinProcessNative>(this->m_pid);
+        } catch (const std::exception& e) {
+            this->warn("inject into '%d' failed: %s", this->m_pid, e.what());
+            return false;
+        }
+    } else {
+        this->error("Unknown running mode");
+        return false;
     }
 
     if (!suspend_state) {
@@ -372,10 +368,25 @@ bool ScyllaAPP::inject_process() {
         }
     }
 
+    auto log_server_config = make_shared<scylla::LogServerConfig>();
+    log_server_config->data = this;
+    log_server_config->is_callback_log_server = true;
+    log_server_config->on_log = [](const char* log, int len, void* data) {
+        auto self = static_cast<ScyllaAPP*>(data);
+        self->m_logs.push_back(string(log, len));
+    };
+
     try {
         this->m_charybdis = make_unique<scylla::Charybdis>(this->m_process);
         auto config = this->m_charybdis->get_splug_config();
+        config->set("logger", log_server_config);
+
         this->m_charybdis->doit(this->m_splugView->getNode());
+        this->m_injected = true;
+        if (!this->m_process->resumeThread(std::move(suspend_state))) {
+            this->warn("Failed to resume process");
+            return false;
+        }
         return true;
     } catch (const std::exception& e) {
         this->warn("Failed to create Charybdis: %s", e.what());
@@ -384,6 +395,22 @@ bool ScyllaAPP::inject_process() {
 }
 
 void ScyllaAPP::undo_inject() {
+    if (!this->m_injected) {
+        this->error("Nothing to undo, this should never happen");
+        return;
+    }
+
+    if (!this->m_charybdis) {
+        this->error("Charybdis is nullptr, this should never happen");
+        return;
+    }
+
+    try {
+        this->m_charybdis->undo();
+        this->m_injected = false;
+    } catch (const std::exception& e) {
+        this->error("Failed to undo: %s", e.what());
+    }
 }
 
 void ScyllaAPP::send(const char* msg, uint16_t len) {

@@ -1,4 +1,5 @@
 #include "scyllagui/splug/dll_injector.h"
+#include "scylla/utils.h"
 #include <imgui.h>
 #include <stdexcept>
 using namespace std;
@@ -91,6 +92,12 @@ bool GuiSplugDllInjector::show() {
         ImGui::Checkbox("Stealthy", &state.stealthy);
 
         ImGui::InputText("DLL Path", state.dll_path.get(), MAX_ADDR_LEN);
+        ImGui::SameLine();
+        if (ImGui::Button("...")) {
+            auto path = ChooserFile("DLL Files (*.dll)\0*.dll\0ALL Files (*.*)\0*.*\0");
+            if (path)
+                strncpy(state.dll_path.get(), path, MAX_ADDR_LEN);
+        }
         ImGui::InputText("Export Data Symbol", state.exchange.get(), MAX_ADDR_LEN);
 
         if (ImGui::BeginPopupModal("Delete?")) {

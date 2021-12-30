@@ -12,7 +12,7 @@
 
 namespace scylla {
 
-struct LogServerConfig: public SPlugConfig {
+struct LogServerConfig: public SPlugConfigItem {
     bool is_callback_log_server;
     std::function<void(const char*, int, void*)> on_log;
     void* data;

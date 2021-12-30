@@ -11,6 +11,7 @@
 struct HookPairState {
     std::shared_ptr<char> m_original;
     std::shared_ptr<char> m_hook;
+    std::string m_remark;
     bool m_editing;
     bool m_delete;
     bool m_enable;

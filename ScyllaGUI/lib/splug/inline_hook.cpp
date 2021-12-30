@@ -26,11 +26,16 @@ GuiSplugInlineHook::GuiSplugInlineHook(const YAML::Node& node) {
             if (key == "disable")
                 continue;
 
-            auto val = pair.second.as<string>();
+            auto val = trimstring(pair.second.as<string>());
             if (val.find(INLINE_HOOK_DISABLE_PREFIX) == 0) {
                 enable = false;
                 val = val.substr(strlen(INLINE_HOOK_DISABLE_PREFIX));
                 val = trimstring(val);
+            }
+            string remark;
+            if (val.find(INLINE_HOOK_REMARK_SEPARATOR) != string::npos) {
+                remark = val.substr(val.find(INLINE_HOOK_REMARK_SEPARATOR) + strlen(INLINE_HOOK_REMARK_SEPARATOR));
+                val = val.substr(0, val.find(INLINE_HOOK_REMARK_SEPARATOR));
             }
             auto s_key = shared_ptr<char>(new char[MAX_TARGET_LEN], std::default_delete<char[]>());
             auto s_val = shared_ptr<char>(new char[MAX_TARGET_LEN], std::default_delete<char[]>());
@@ -40,6 +45,7 @@ GuiSplugInlineHook::GuiSplugInlineHook(const YAML::Node& node) {
             state.m_enable = enable;
             state.m_original = s_key;
             state.m_hook = s_val;
+            state.m_remark = remark;
             state.m_editing = false;
             state.m_delete = false;
             hooks.push_back(state);
@@ -83,8 +89,15 @@ YAML::Node GuiSplugInlineHook::getNode() {
         for (auto& state : pair.second.m_hooks) {
             string org(state.m_original.get());
             string trg(state.m_hook.get());
+
+            if (org.empty())
+                continue;
+
             if (!state.m_enable)
                 trg = INLINE_HOOK_DISABLE_PREFIX + trg;
+            
+            if (!state.m_remark.empty())
+                trg += INLINE_HOOK_REMARK_SEPARATOR + state.m_remark;
 
             n[org] = trg;
         }
@@ -94,8 +107,15 @@ YAML::Node GuiSplugInlineHook::getNode() {
     for (auto& state : this->m_hooks) {
         string org(state.m_original.get());
         string trg(state.m_hook.get());
+
+        if (org.empty())
+            continue;
+
         if (!state.m_enable)
             trg = INLINE_HOOK_DISABLE_PREFIX + trg;
+        
+        if (!state.m_remark.empty())
+            trg += INLINE_HOOK_REMARK_SEPARATOR + state.m_remark;
 
         node[org] = trg;
     }
@@ -184,6 +204,16 @@ bool GuiSplugInlineHook::show() {
                 
                 ImGui::SameLine();
                 ImGui::Checkbox("", &it->m_enable);
+
+                if (!it->m_remark.empty()) {
+                    ImGui::SameLine();
+                    ImGui::Button(" ");
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::BeginTooltip();
+                        ImGui::Text(it->m_remark.c_str());
+                        ImGui::EndTooltip();
+                    }
+                }
 
                 ImGui::PopID();
             }

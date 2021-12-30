@@ -12,4 +12,9 @@
  */
 #define INLINE_HOOK_DISABLE_PREFIX "//"
 
+/**
+ * inline hook remark separator
+ */
+#define INLINE_HOOK_REMARK_SEPARATOR "//"
+
 #endif // _SCYLLA_CONSTANTS_H_

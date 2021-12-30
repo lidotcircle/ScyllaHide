@@ -1,7 +1,7 @@
 #ifndef _SCYLLA_EXCHANGE_MX_H_
 #define _SCYLLA_EXCHANGE_MX_H_
 
-#include "./exchange.h"
+#include "scylla/exchange.h"
 #include "../process/win_process_native.h"
 #include <vector>
 #include <string>

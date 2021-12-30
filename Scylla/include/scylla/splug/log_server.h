@@ -4,7 +4,7 @@
 #include "../splug.h"
 #include "../context_base.h"
 #include "../splug_config.h"
-#include "../../logger/log_server.h"
+#include "logger/log_server.h"
 #include <memory>
 #include <thread>
 #include <functional>

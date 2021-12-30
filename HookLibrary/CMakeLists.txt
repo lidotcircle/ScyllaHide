@@ -1,5 +1,4 @@
 
-set(HookLibrary_SOURCES "")
 file(GLOB_RECURSE HookLibrary_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/lib/**.cpp)
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     SET(InstrumentationCallbackSource ${CMAKE_CURRENT_LIST_DIR}/lib/InstrumentationCallbackX64.asm)
@@ -17,12 +16,17 @@ elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
 endif()
 target_include_directories(HookLibrary PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
 
-target_link_libraries(HookLibrary scylla)
+target_link_libraries(HookLibrary ntdll)
+target_link_libraries(HookLibrary sexchange_MT)
+target_link_libraries(HookLibrary slogger_MT)
+target_link_libraries(HookLibrary sutils_MT)
 
 # staticlly link to msvcrt
-set_property(TARGET HookLibrary PROPERTY
-  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-# target_compile_definitions(HookLibrary PRIVATE NOT_USING_MSVC_ENTRY=1)
+target_compile_options(HookLibrary PRIVATE
+    $<$<CONFIG:>:/MT>
+    $<$<CONFIG:Debug>:/MTd>
+    $<$<CONFIG:Release>:/MT>)
+#target_compile_definitions(HookLibrary PRIVATE NOT_USING_MSVC_ENTRY=1)
 
 set(HookLibraryOutputFile $<TARGET_FILE:HookLibrary>)
 add_custom_target(generate_c_resource COMMAND ${CMAKE_COMMAND} 

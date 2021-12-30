@@ -26,6 +26,13 @@ include(${CMAKE_CURRENT_LIST_DIR}/dearIMGUI.cmake)
 add_library(printf STATIC ${CMAKE_CURRENT_LIST_DIR}/printf/printf.c)
 target_include_directories(printf PUBLIC ${CMAKE_CURRENT_LIST_DIR}/printf)
 
+add_library(printf_MT STATIC ${CMAKE_CURRENT_LIST_DIR}/printf/printf.c)
+target_include_directories(printf_MT PUBLIC ${CMAKE_CURRENT_LIST_DIR}/printf)
+target_compile_options(printf_MT PRIVATE
+    $<$<CONFIG:>:/MT>
+    $<$<CONFIG:Debug>:/MTd>
+    $<$<CONFIG:Release>:/MT>)
+
 
 set(PEPARSE_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/pe-parse/pe-parser-library)
 list(APPEND PEPARSERLIB_SOURCEFILES

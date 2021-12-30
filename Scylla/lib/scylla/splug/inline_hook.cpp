@@ -1,5 +1,7 @@
 #include "process/map_pe_module.h"
 #include "scylla/splug/inline_hook.h"
+#include "scylla_constants.h"
+#include <iostream>
 #include <stdexcept>
 #include <vector>
 #include <tuple>
@@ -43,6 +45,8 @@ static addr_t parseAddr(const string& str) {
  *   3. a module name and a file offset eg. "ntdll.dll#0x1234",
  *   4. a module name and a relative virtual address eg. "ntdll.dll$0x1234",
  *   5. for 2. and 3. and 4. hooked targets of in a module can be specified as a yaml map
+ * 
+ * 3. if hook target start with "//", it means the hook is disabled
  * 
  *  note: address is a hexdecimal number which must start with 0x
  */
@@ -92,6 +96,9 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
         return make_tuple(addr, mod, func);
     };
     auto add_hook = [&](const string& original_target, const string& hook_target) {
+        if (strStartWith(hook_target, INLINE_HOOK_DISABLE_PREFIX))
+            return;
+
         try {
             auto original_info = resolve_expr(original_target);
             auto hook_info   = resolve_expr(hook_target);
@@ -115,6 +122,9 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
             for (auto it=val.begin();it!=val.end();it++) {
                 string kn = str;
                 auto k = it->first.as<string>();
+                if (k == "disable")
+                    continue;
+
                 auto v = it->second.as<string>();
                 if (strStartWith(k, "$") || strStartWith(k, "#")) {
                     kn = kn + k;

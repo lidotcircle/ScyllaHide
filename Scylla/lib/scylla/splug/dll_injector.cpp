@@ -1,11 +1,17 @@
 #include "scylla/splug/dll_injector.h"
+#include "hook_library.h"
 #include "str_utils.h"
+#include "scylla_constants.h"
 #include <stdexcept>
 using namespace std;
 using namespace scylla;
 
 
 namespace scylla {
+
+const unsigned char* hook_library_data = hook_library;
+const size_t         hook_library_data_size = sizeof(hook_library);
+
 
 InjectDLLInfo::~InjectDLLInfo() {}
 
@@ -28,6 +34,9 @@ void SPlugDLLInjector::doit(const YAML::Node& node) {
         auto& n = node[i];
         if (!n.IsMap())
             throw std::runtime_error("SPlugDLLInjector::doit: dll node is not a map");
+        
+        if (n["disable"].as<bool>(false))
+            continue;
 
         auto path     = n["path"].as<string>();
         auto stealthy = n["stealthy"].as<bool>(false);
@@ -35,8 +44,12 @@ void SPlugDLLInjector::doit(const YAML::Node& node) {
 
         if (path.empty())
             throw std::runtime_error("SPlugDLLInjector::doit: dll path is empty");
-        
-        process->inject_dll(path, stealthy);
+
+        if (path == ANTIANTI_DLL) {
+            process->inject_dll(hook_library_data, hook_library_data_size, path, stealthy);
+        } else {
+            process->inject_dll(path, stealthy);
+        }
         auto mname = canonicalizeModuleName(path);
         inject_info->dlls.push_back(make_pair(mname, exchange));
     }

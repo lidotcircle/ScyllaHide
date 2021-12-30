@@ -26,6 +26,9 @@ struct InjectDLLInfo: public ScyllaContextItem {
     virtual ~InjectDLLInfo() override;
 };
 
+extern const unsigned char*  hook_library_data;
+extern const size_t          hook_library_data_size;
+
 } // namespace scylla
 
 #endif // _SPLUG_DLL_INJECTOR_H_

@@ -13,13 +13,19 @@ struct HookPairState {
     std::shared_ptr<char> m_hook;
     bool m_editing;
     bool m_delete;
+    bool m_enable;
+};
+
+struct HookModule {
+    bool m_enable;
+    std::vector<HookPairState> m_hooks;
 };
 
 class GuiSplugInlineHook : public GuiYamlNode
 {
 private:
     std::vector<HookPairState> m_hooks;
-    std::map<std::string,std::vector<HookPairState>> m_hooks_by_module;
+    std::map<std::string,HookModule> m_hooks_by_module;
     bool m_enable;
 
 public:

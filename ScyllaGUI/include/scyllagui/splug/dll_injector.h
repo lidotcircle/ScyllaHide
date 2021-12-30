@@ -10,6 +10,7 @@ struct DLLInjectState {
     bool enable;
     bool stealthy;
     bool deleted;
+    bool is_internal;
     std::shared_ptr<char> dll_path;
     std::shared_ptr<char> exchange;
 };

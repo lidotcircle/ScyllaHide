@@ -1,4 +1,6 @@
 #include "scyllagui/splug/inline_hook.h"
+#include "scylla_constants.h"
+#include "str_utils.h"
 #include <stdexcept>
 #include <imgui.h>
 using namespace std;
@@ -12,15 +14,30 @@ GuiSplugInlineHook::GuiSplugInlineHook(const YAML::Node& node) {
 
     this->m_enable = !node["disable"].as<bool>(false);
 
-    auto add_module = [&](const YAML::Node& n, vector<HookPairState>& hooks) {
+    auto add_module = [&](const YAML::Node& n, HookModule& hook_module) {
+        auto& hooks = hook_module.m_hooks;
+        hook_module.m_enable = true;
+        if (n.IsMap())
+            hook_module.m_enable = !n["disable"].as<bool>(false);
+
         for (auto& pair : n) {
+            bool enable = true;
             auto key = pair.first.as<string>();
+            if (key == "disable")
+                continue;
+
             auto val = pair.second.as<string>();
+            if (val.find(INLINE_HOOK_DISABLE_PREFIX) == 0) {
+                enable = false;
+                val = val.substr(strlen(INLINE_HOOK_DISABLE_PREFIX));
+                val = trimstring(val);
+            }
             auto s_key = shared_ptr<char>(new char[MAX_TARGET_LEN], std::default_delete<char[]>());
             auto s_val = shared_ptr<char>(new char[MAX_TARGET_LEN], std::default_delete<char[]>());
             strncpy(s_key.get(), key.c_str(), MAX_TARGET_LEN);
             strncpy(s_val.get(), val.c_str(), MAX_TARGET_LEN);
             HookPairState state;
+            state.m_enable = enable;
             state.m_original = s_key;
             state.m_hook = s_val;
             state.m_editing = false;
@@ -37,7 +54,7 @@ GuiSplugInlineHook::GuiSplugInlineHook(const YAML::Node& node) {
             continue;
 
         if (val.IsMap()) {
-            this->m_hooks_by_module[key] = vector<HookPairState>();
+            this->m_hooks_by_module[key] = HookModule();
             add_module(val, this->m_hooks_by_module[key]);
         } else {
             auto mval = val.as<string>();
@@ -61,9 +78,14 @@ YAML::Node GuiSplugInlineHook::getNode() {
 
     for (auto& pair : this->m_hooks_by_module) {
         YAML::Node n;
-        for (auto& state : pair.second) {
+        n["disable"] = !pair.second.m_enable;
+
+        for (auto& state : pair.second.m_hooks) {
             string org(state.m_original.get());
             string trg(state.m_hook.get());
+            if (!state.m_enable)
+                trg = INLINE_HOOK_DISABLE_PREFIX + trg;
+
             n[org] = trg;
         }
         node[pair.first] = n;
@@ -72,6 +94,9 @@ YAML::Node GuiSplugInlineHook::getNode() {
     for (auto& state : this->m_hooks) {
         string org(state.m_original.get());
         string trg(state.m_hook.get());
+        if (!state.m_enable)
+            trg = INLINE_HOOK_DISABLE_PREFIX + trg;
+
         node[org] = trg;
     }
 
@@ -107,7 +132,7 @@ bool GuiSplugInlineHook::show() {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
 
-                if (it->m_editing) {
+                if (it->m_editing && it->m_enable) {
                     ImGui::InputText("##origin", it->m_original.get(), MAX_TARGET_LEN);
                     ImGui::TableNextColumn();
                     ImGui::InputText("##hook", it->m_hook.get(), MAX_TARGET_LEN);
@@ -129,8 +154,11 @@ bool GuiSplugInlineHook::show() {
                     }
                 }
                 ImGui::TableNextColumn();
+                bool disabled = !it->m_enable;
+                if (disabled)
+                    ImGui::BeginDisabled();
 
-                if (it->m_editing) {
+                if (it->m_editing && it->m_enable) {
                     if (ImGui::Button("S", mbtn_size)) {
                         it->m_editing = false;
                     }
@@ -150,6 +178,12 @@ bool GuiSplugInlineHook::show() {
                 }
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("删除");
+                
+                if (disabled)
+                    ImGui::EndDisabled();
+                
+                ImGui::SameLine();
+                ImGui::Checkbox("", &it->m_enable);
 
                 ImGui::PopID();
             }
@@ -203,9 +237,16 @@ bool GuiSplugInlineHook::show() {
     for (auto& kv: this->m_hooks_by_module) {
         if (ImGui::TreeNode(kv.first.c_str())) {
             ImGui::PushID(kv.first.c_str());
-            if (!add_hook(kv.second, true)) {
+            ImGui::Checkbox("enable", &kv.second.m_enable);
+            bool disabled = !kv.second.m_enable;
+            if (disabled)
+                ImGui::BeginDisabled();
+
+            if (!add_hook(kv.second.m_hooks, true)) {
                 delete_m.push_back(kv.first);
             }
+            if (disabled)
+                ImGui::EndDisabled();
             ImGui::PopID();
             ImGui::TreePop();
         }
@@ -236,8 +277,11 @@ bool GuiSplugInlineHook::show() {
         ImGui::InputText("##module", new_module_name, MAX_TARGET_LEN);
 
         if (ImGui::Button("Add")) {
-            if (this->m_hooks_by_module.find(new_module_name) == this->m_hooks_by_module.end())
-                this->m_hooks_by_module[new_module_name] = vector<HookPairState>();
+            if (this->m_hooks_by_module.find(new_module_name) == this->m_hooks_by_module.end()) {
+                HookModule nm;
+                nm.m_enable = true;
+                this->m_hooks_by_module[new_module_name] = nm;
+            }
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();

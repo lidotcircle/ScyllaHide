@@ -21,6 +21,16 @@ std::string strformat(const char* fmt, ...) {
     return string(buf);
 }
 
+string trimstring(string str) {
+    if (str.find_first_not_of(" \t\r\n") != string::npos)
+        str.erase(0, str.find_first_not_of(" \t\r\n"));
+
+    if (str.find_last_not_of(" \t\r\n") != string::npos)
+        str.erase(str.find_last_not_of(" \t\r\n") + 1);
+
+    return str;
+}
+
 string canonicalizeModuleName(string name) {
     std::transform(name.begin(), name.end(), name.begin(), ::tolower);
     if (name.find_last_of('\\') != string::npos)

@@ -136,8 +136,10 @@ public:
 
 int ScyllaAPP::render_frame() {
     auto& io = ImGui::GetIO();
-    ImGui::SetNextWindowPos( ImVec2(0,0) );
-    ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x, io.DisplaySize.y));
+    auto viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowViewport(viewport->ID);
+    ImGui::SetNextWindowPos(viewport->WorkPos);
+    ImGui::SetNextWindowSize(viewport->WorkSize);
 
     if (ImGui::Begin("MainWindow" , nullptr , 
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
@@ -319,7 +321,7 @@ void ScyllaAPP::process_id_widget() {
 void ScyllaAPP::log_window() {
     if (!this->m_show_log_window)
         return;
-    
+
     if (ImGui::Begin("Log", &this->m_show_log_window)) {
         for (auto& log : this->m_logs) {
             ImGui::Text(log.c_str());
@@ -373,6 +375,8 @@ bool ScyllaAPP::inject_process() {
     log_server_config->is_callback_log_server = true;
     log_server_config->on_log = [](const char* log, int len, void* data) {
         auto self = static_cast<ScyllaAPP*>(data);
+        if (!self->m_recieve_log)
+            return;
         self->m_logs.push_back(string(log, len));
     };
 

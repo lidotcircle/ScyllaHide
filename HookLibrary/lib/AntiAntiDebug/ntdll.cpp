@@ -1053,13 +1053,13 @@ DLLExport_C NTSTATUS NTAPI HookedNtResumeThread(HANDLE ThreadHandle, PULONG Prev
 
 DLLExport_C NTSTATUS NTAPI HookedNtWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG BufferSize, PULONG NumberofBytesWritten)
 {
-    auto client = logClient();
+    auto& client = logClient();
     auto val = exchange_data.lookup_key("key");
     auto v2 = exchange_data.lookup_trampoline("LoadLibraryA");
-    client->sendfmt("NtWriteVirtualMemory(ProcessHandle = %d, BaseAddress = 0x%08x, \n"
-                    "                     Buffer = ..., BufferSize = 0x%04x, PNumberOfBytesWritten = 0x%08x)%lx %lx %lx %s",
+    client.sendfmt("NtWriteVirtualMemory(ProcessHandle = %d, BaseAddress = 0x%08x, \n"
+                    "                     Buffer = ..., BufferSize = 0x%04x, PNumberOfBytesWritten = 0x%08x)",
         ProcessHandle, BaseAddress,
-        BufferSize, NumberofBytesWritten, val, v2, &exchange_data, val);
+        BufferSize, NumberofBytesWritten);
 
     auto dNtWriteVirtualMemory = exchange_data.lookup_trampoline<decltype(&NtWriteVirtualMemory)>(&NtWriteVirtualMemory);
     return dNtWriteVirtualMemory(ProcessHandle, BaseAddress, Buffer, BufferSize, NumberofBytesWritten);
@@ -1067,8 +1067,8 @@ DLLExport_C NTSTATUS NTAPI HookedNtWriteVirtualMemory(HANDLE ProcessHandle, PVOI
 
 DLLExport_C NTSTATUS NTAPI HookedNtReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToRead, PULONG NumberOfBytesReaded)
 {
-    auto client = logClient();
-    client->sendfmt("NtReadVirtualMemory(ProcessHandle = %d, BaseAddress = 0x%08x, \n"
+    auto& client = logClient();
+    client.sendfmt("NtReadVirtualMemory(ProcessHandle = %d, BaseAddress = 0x%08x, \n"
                     "                    Buffer = ..., NumberOfBytesToRead = 0x%08x, \n"
                     "                    PNumberOfBytesReaded = 0x%08x)",
         ProcessHandle, BaseAddress, NumberOfBytesToRead, NumberOfBytesReaded);
@@ -1087,8 +1087,8 @@ DLLExport_C NTSTATUS NTAPI HookedNtOpenProcess(
     auto dNtOpenProcess = exchange_data.lookup_trampoline<decltype(&NtOpenProcess)>(&NtOpenProcess);
     auto ans = dNtOpenProcess(ProcessHandle, DesiredAccess, ObjectAttributes, ClientId);
 
-    auto client = logClient();
-    client->sendfmt("NtOpenProcess(PProcessHandle = 0x%08x, 0xDesiredAccess = %08x, \n"
+    auto& client = logClient();
+    client.sendfmt("NtOpenProcess(PProcessHandle = 0x%08x, 0xDesiredAccess = %08x, \n"
                     "              ObjectAttributes = 0x%04x, ClientId = 0x%08x) => %d",
         ProcessHandle, DesiredAccess, ObjectAttributes, ClientId, *ProcessHandle);
 

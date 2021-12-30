@@ -90,6 +90,9 @@ public:
         this->m_injected = false;
         this->m_injected_pid = 0;
 
+        YAML::Node empty;
+        this->m_splugView = make_unique<GuiSplugView>(empty);
+
         if (ifstream("scylla.yaml")) {
             m_fileName = "scylla.yaml";
             this->openFile(this->m_fileName);
@@ -348,6 +351,13 @@ bool ScyllaAPP::inject_process() {
 
         if (this->m_pid == 0) {
             this->warn("Process %s not found", this->m_process_name.get());
+            return false;
+        }
+
+        try {
+            this->m_process = make_shared<WinProcessNative>(this->m_pid);
+        } catch (const std::exception& e) {
+            this->warn("inject into '%s' failed: %s", this->m_process_name.get(), e.what());
             return false;
         }
     } else if (this->m_mode == RunningMode_PID) {

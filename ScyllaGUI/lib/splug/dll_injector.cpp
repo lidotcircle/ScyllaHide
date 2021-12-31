@@ -110,40 +110,40 @@ bool GuiSplugDllInjector::show() {
         }
 
         ImVec2 dummy(20, 0);
-        ImGui::Checkbox("Enable", &state.enable);
+        ImGui::Checkbox("启用", &state.enable);
         ImGui::SameLine();
         ImGui::Dummy(dummy);
         ImGui::SameLine();
-        ImGui::Checkbox("Stealthy", &state.stealthy);
+        ImGui::Checkbox("内存注入", &state.stealthy);
 
         if (is_internal)
             ImGui::BeginDisabled();
 
-        ImGui::InputText("DLL Path", state.dll_path.get(), MAX_ADDR_LEN);
+        ImGui::InputText("DLL路径", state.dll_path.get(), MAX_ADDR_LEN);
         ImGui::SameLine();
         if (ImGui::Button("...")) {
             auto path = ChooserFile("DLL Files (*.dll)\0*.dll\0ALL Files (*.*)\0*.*\0");
             if (path)
                 strncpy(state.dll_path.get(), path, MAX_ADDR_LEN);
         }
-        ImGui::InputText("Export Data Symbol", state.exchange.get(), MAX_ADDR_LEN);
+        ImGui::InputText("exchange 导出符号", state.exchange.get(), MAX_ADDR_LEN);
 
         if (is_internal)
             ImGui::EndDisabled();
 
         if (ImGui::BeginPopupModal("Delete?")) {
-            ImGui::Text("Are you sure you want to delete this item?");
-            if (ImGui::Button("Yes")) {
+            ImGui::Text("确认删除 ?");
+            if (ImGui::Button("是")) {
                 state.deleted = true;
                 ImGui::CloseCurrentPopup();
             }
             ImGui::SameLine();
-            if (ImGui::Button("No")) {
+            if (ImGui::Button("否")) {
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
         }
-        if (ImGui::Button("Delete"))
+        if (!is_internal && ImGui::Button("删除"))
             ImGui::OpenPopup("Delete?");
 
         ImGui::PopID();
@@ -159,7 +159,7 @@ bool GuiSplugDllInjector::show() {
     auto add_size = ImVec2(width * 0.4, 35);
     ImGui::Dummy(ImVec2((width - add_size.x) / 2, 0));
     ImGui::SameLine();
-    if (ImGui::Button("Add", add_size)) {
+    if (ImGui::Button("新增", add_size)) {
         DLLInjectState state;
         state.enable = true;
         state.stealthy = false;

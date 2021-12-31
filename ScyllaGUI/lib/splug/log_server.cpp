@@ -32,10 +32,14 @@ bool GuiSplugLogServer::show() {
     if (this->m_port < 0 || this->m_port > 65535)
         this->m_port = 0;
 
-    ImGui::Checkbox("Enable", &m_enable);
+    ImGui::Checkbox("开启", &m_enable);
     if (m_enable) {
-        ImGui::InputInt("UDP Port", &m_port);
-        ImGui::InputText("UDP Addr", m_addr.get(), MAX_ADDR_LEN);
+        ImGui::InputInt("UDP端口", &m_port);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("如果设置为0，则使用随机端口, 建议设置为0");
+        ImGui::InputText("UDP地址", m_addr.get(), MAX_ADDR_LEN);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("ipv4 地址或者 localhost, 建议设置为localhost");
     }
 
     return true;

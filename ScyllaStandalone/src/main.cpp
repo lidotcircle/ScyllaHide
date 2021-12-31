@@ -109,9 +109,9 @@ public:
             auto node = YAML::LoadFile(fullfilename);
             this->m_splugView = make_unique<GuiSplugView>(node);
             this->m_fileName = fullfilename;
-            this->info("Loaded file: %s", fullfilename);
+            this->info("加载配置文件: %s", fullfilename);
         } catch (exception& e) {
-            this->error("Load config failed: %s", e.what());
+            this->error("加载配置文件失败: %s", e.what());
         }
     }
 
@@ -125,13 +125,13 @@ public:
     void saveFile(const string& filename) {
         ofstream outfile(filename);
         if (!outfile.is_open()) {
-            this->error("Failed to open file %s", filename.c_str());
+            this->error("打开文件 %s 失败", filename.c_str());
             return;
         }
 
         outfile << this->m_splugView->getNode();
         this->m_fileName = filename;
-        this->info("Saved to '%s'", filename.c_str());
+        this->info("保存到 '%s'", filename.c_str());
     }
 
     void saveFile() {
@@ -158,13 +158,13 @@ int ScyllaAPP::render_frame() {
     {
         if (ImGui::BeginChild("FileMenu", ImVec2(0, 20), false, ImGuiWindowFlags_NoScrollbar))
         {
-            if (ImGui::Button("Open")) {
+            if (ImGui::Button("打开")) {
                 auto file = ChooserFile("YAML (*.yaml)\0*.yaml\0ALL Files (*.*)\0*.*\0");
                 if (file != nullptr)
                     this->openFile(file);
             }
             ImGui::SameLine();
-            if (ImGui::Button("Save")) {
+            if (ImGui::Button("保存")) {
                 if (!this->m_fileName.empty()) {
                     this->saveFile();
                 } else {
@@ -174,7 +174,7 @@ int ScyllaAPP::render_frame() {
                 }
             }
             ImGui::SameLine();
-            if (ImGui::Button("Save As")) {
+            if (ImGui::Button("另存")) {
                 auto file = SaveFileTo("YAML (*.yaml)\0*.yaml\0ALL Files (*.*)\0*.*\0", "scylla.yaml");
                 if (file != nullptr)
                     this->saveFile(file);
@@ -217,12 +217,12 @@ int ScyllaAPP::render_frame() {
 void ScyllaAPP::child_window_control()
 {
     static const char* modes[] = {
-        "By Command Line",
-        "By Process Name",
-        "By Process ID"
+        "新进程",
+        "进程名称",
+        "进程ID"
     };
 
-    if (ImGui::BeginCombo("Running Mode", modes[m_mode])) {
+    if (ImGui::BeginCombo("模式", modes[m_mode])) {
         for (int i = 0; i < 3; i++) {
             const bool is_selected = (i == m_mode);
             if (ImGui::Selectable(modes[i], is_selected)) {
@@ -255,28 +255,28 @@ void ScyllaAPP::child_window_control()
     ImGui::Separator();
     ImGui::Spacing();
 
-    if (ImGui::Button("Start")) {
+    if (ImGui::Button("运行")) {
         this->m_injected = this->inject_process();
     }
 
     if (!this->m_injected)
         ImGui::BeginDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Undo")) {
+    if (ImGui::Button("取消")) {
         this->undo_inject();
     }
     if (!this->m_injected)
         ImGui::EndDisabled();
 
     ImGui::SameLine();
-    ImGui::Checkbox("Show Log Window", &m_show_log_window);
+    ImGui::Checkbox("显示日志窗口", &m_show_log_window);
 
     ImGui::SameLine();
-    ImGui::Checkbox("Recieve Log", &m_recieve_log);
+    ImGui::Checkbox("接收日志", &m_recieve_log);
 }
 
 void ScyllaAPP::new_process_widget() {
-    ImGui::InputText("Executable", m_executable.get(), MAX_PATH);
+    ImGui::InputText("可执行文件", m_executable.get(), MAX_PATH);
     ImGui::SameLine();
     if (ImGui::Button("...")) {
         auto file = ChooserFile("Executable (*.exe)\0*.exe\0ALL Files (*.*)\0*.*\0");
@@ -284,10 +284,10 @@ void ScyllaAPP::new_process_widget() {
             strncpy(m_executable.get(), file, MAX_PATH);
     }
 
-    ImGui::InputText("CMDLine Arguments", m_cmdline.get(), MAX_CMDLINE_ARGS_LEN);
+    ImGui::InputText("命令行参数", m_cmdline.get(), MAX_CMDLINE_ARGS_LEN);
 }
 void ScyllaAPP::process_name_widget() {
-    ImGui::InputText("Process Name", m_process_name.get(), MAX_PATH);
+    ImGui::InputText("进程名", m_process_name.get(), MAX_PATH);
 
     if (ImGui::Button("R")) {
         string pn(m_process_name.get());
@@ -305,7 +305,7 @@ void ScyllaAPP::process_name_widget() {
     }
 }
 void ScyllaAPP::process_id_widget() {
-    ImGui::InputInt("Process ID", &this->m_pid);
+    ImGui::InputInt("进程ID", &this->m_pid);
 
     if (this->m_pid < 0)
         this->m_pid = 0;
@@ -316,7 +316,7 @@ void ScyllaAPP::process_id_widget() {
             this->process_name_by_pid = pn;
             this->m_prev_pid = this->m_pid;
         } else {
-            this->warn("Process ID %d not found", this->m_pid);
+            this->warn("找不到进程ID %d", this->m_pid);
         }
     }
 
@@ -348,28 +348,28 @@ bool ScyllaAPP::inject_process() {
         suspend_state = CreateProcessAndSuspend(_exe + " " + _cmdline, this->m_process, SUSPEND_ON_ENTRYPOINT);
 
         if (!suspend_state) {
-            this->warn("Failed to create process and suspend it");
+            this->error("创建新进程失败");
             return false;
         }
     } else if (this->m_mode == RunningMode_ProcessName) {
         this->m_pid = GetPidByProcessName(this->m_process_name.get());
 
         if (this->m_pid == 0) {
-            this->warn("Process %s not found", this->m_process_name.get());
+            this->error("找不到进程 %s", this->m_process_name.get());
             return false;
         }
 
         try {
             this->m_process = make_shared<WinProcessNative>(this->m_pid);
         } catch (const std::exception& e) {
-            this->warn("inject into '%s' failed: %s", this->m_process_name.get(), e.what());
+            this->warn("操作失败 '%s': %s", this->m_process_name.get(), e.what());
             return false;
         }
     } else if (this->m_mode == RunningMode_PID) {
         try {
             this->m_process = make_shared<WinProcessNative>(this->m_pid);
         } catch (const std::exception& e) {
-            this->warn("inject into '%d' failed: %s", this->m_pid, e.what());
+            this->warn("操作失败 '%d': %s", this->m_pid, e.what());
             return false;
         }
     } else {
@@ -380,7 +380,7 @@ bool ScyllaAPP::inject_process() {
     if (!suspend_state) {
         suspend_state = this->m_process->suspendThread();
         if (!suspend_state) {
-            this->warn("Failed to suspend process");
+            this->warn("暂停线程失败");
             return false;
         }
     }
@@ -403,12 +403,12 @@ bool ScyllaAPP::inject_process() {
         this->m_charybdis->doit(this->m_splugView->getNode());
         this->m_injected = true;
         if (!this->m_process->resumeThread(std::move(suspend_state))) {
-            this->warn("Failed to resume process");
+            this->warn("恢复线程失败");
             return false;
         }
         return true;
     } catch (const std::exception& e) {
-        this->warn("Failed to create Charybdis: %s", e.what());
+        this->warn("创建 Charybdis 失败: %s", e.what());
         return false;
     }
 }
@@ -428,7 +428,7 @@ void ScyllaAPP::undo_inject() {
         this->m_charybdis->undo();
         this->m_injected = false;
     } catch (const std::exception& e) {
-        this->error("Failed to undo: %s", e.what());
+        this->error("取消失败: %s", e.what());
     }
 }
 

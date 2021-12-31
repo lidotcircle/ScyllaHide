@@ -47,9 +47,9 @@ bool GuiSplugKeyValue::show() {
     vector<size_t> delete_s;
     ImVec2 btn_size(20, 20);
     if (ImGui::BeginTable("##key_value_table", 3)) {
-        ImGui::TableSetupColumn("Key", ImGuiTableColumnFlags_WidthFixed, 0.4 * width);
-        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 0.4 * width);
-        ImGui::TableSetupColumn("Actions",  ImGuiTableColumnFlags_WidthFixed, 0.2 * width);
+        ImGui::TableSetupColumn("键", ImGuiTableColumnFlags_WidthFixed, 0.4 * width);
+        ImGui::TableSetupColumn("值", ImGuiTableColumnFlags_WidthFixed, 0.4 * width);
+        ImGui::TableSetupColumn("操作",  ImGuiTableColumnFlags_WidthFixed, 0.2 * width);
         ImGui::TableHeadersRow();
 
         size_t i = 0;
@@ -112,7 +112,7 @@ bool GuiSplugKeyValue::show() {
     auto add_size = ImVec2(width * 0.4, 35);
     ImGui::Dummy(ImVec2((width - add_size.x) / 2, 0));
     ImGui::SameLine();
-    if (ImGui::Button("Add", add_size)) {
+    if (ImGui::Button("新增", add_size)) {
         KeyValueState state;
         state.m_delete = false;
         state.m_editing = true;

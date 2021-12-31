@@ -128,7 +128,7 @@ bool GuiSplugInlineHook::show() {
     if (!this->visibility())
         return false;
     
-    ImGui::Checkbox("Enable", &this->m_enable);
+    ImGui::Checkbox("启用", &this->m_enable);
     ImGui::Spacing();
 
     auto add_hook = [&](vector<HookPairState>& hooks, bool add_btn) {
@@ -136,9 +136,11 @@ bool GuiSplugInlineHook::show() {
         vector<size_t> delete_s;
         ImVec2 mbtn_size(20, 20);
         if (hooks.size() > 0 && ImGui::BeginTable("##hook_table", 3)) {
-            ImGui::TableSetupColumn("Original", ImGuiTableColumnFlags_WidthFixed, 0.4 * width);
-            ImGui::TableSetupColumn("Hook", ImGuiTableColumnFlags_WidthFixed, 0.4 * width);
-            ImGui::TableSetupColumn("Actions",  ImGuiTableColumnFlags_WidthFixed, 0.2 * width);
+            ImGui::TableSetupColumn("函数符号", ImGuiTableColumnFlags_WidthFixed, 0.4 * width);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("被 hook 的函数符号");
+            ImGui::TableSetupColumn("Hook 符号", ImGuiTableColumnFlags_WidthFixed, 0.4 * width);
+            ImGui::TableSetupColumn("操作",  ImGuiTableColumnFlags_WidthFixed, 0.2 * width);
             ImGui::TableHeadersRow();
 
             size_t i = 0;
@@ -231,7 +233,7 @@ bool GuiSplugInlineHook::show() {
         ImVec2 btn_size((width - space_size.x * 3) / 2, 35);
         ImGui::Dummy(space_size);
         ImGui::SameLine();
-        if (ImGui::Button("Add", btn_size)) {
+        if (ImGui::Button("新增", btn_size)) {
             HookPairState state;
             state.m_delete = false;
             state.m_editing = true;
@@ -247,7 +249,7 @@ bool GuiSplugInlineHook::show() {
         ImGui::Dummy(space_size);
         ImGui::SameLine();
 
-        if (ImGui::Button("Delete", btn_size)) {
+        if (ImGui::Button("删除", btn_size)) {
             return false;
         }
         if (ImGui::IsItemHovered()) {
@@ -267,7 +269,7 @@ bool GuiSplugInlineHook::show() {
     for (auto& kv: this->m_hooks_by_module) {
         if (ImGui::TreeNode(kv.first.c_str())) {
             ImGui::PushID(kv.first.c_str());
-            ImGui::Checkbox("enable", &kv.second.m_enable);
+            ImGui::Checkbox("启用", &kv.second.m_enable);
             bool disabled = !kv.second.m_enable;
             if (disabled)
                 ImGui::BeginDisabled();
@@ -306,7 +308,7 @@ bool GuiSplugInlineHook::show() {
     if (ImGui::BeginPopupModal("Add Module", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::InputText("##module", new_module_name, MAX_TARGET_LEN);
 
-        if (ImGui::Button("Add")) {
+        if (ImGui::Button("新增")) {
             if (this->m_hooks_by_module.find(new_module_name) == this->m_hooks_by_module.end()) {
                 HookModule nm;
                 nm.m_enable = true;
@@ -315,24 +317,24 @@ bool GuiSplugInlineHook::show() {
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel")) {
+        if (ImGui::Button("取消")) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     }
     ImGui::Dummy(space_size);
     ImGui::SameLine();
-    if (ImGui::Button("Add Module", btn_size)) {
+    if (ImGui::Button("新增模块", btn_size)) {
         ImGui::OpenPopup("Add Module");
     }
     ImGui::SameLine();
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("新增一个模块");
+        ImGui::SetTooltip("新增一个DLL模块");
 
     ImGui::SameLine();
     ImGui::Dummy(space_size);
     ImGui::SameLine();
-    if (ImGui::Button("Add", btn_size)) {
+    if (ImGui::Button("新增", btn_size)) {
         HookPairState state;
         state.m_delete = false;
         state.m_editing = true;

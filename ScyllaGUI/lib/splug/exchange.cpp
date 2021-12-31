@@ -15,6 +15,8 @@ YAML::Node GuiSplugExchange::getNode() {
 }
 
 bool GuiSplugExchange::show() {
-    ImGui::Checkbox("Enable exchange", &this->enable_exchange);
+    ImGui::Checkbox("开启 exchange 写入", &this->enable_exchange);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("将hook、配置、日志端口等信息, 写入到注入的DLL中");
     return true;
 }

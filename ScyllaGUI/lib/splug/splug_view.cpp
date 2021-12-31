@@ -4,6 +4,7 @@
 #include "scyllagui/splug/inline_hook.h"
 #include "scyllagui/splug/key_value.h"
 #include "scyllagui/splug/log_server.h"
+#include "scyllagui/splug/peb_patch.h"
 #include <stdexcept>
 using namespace std;
 
@@ -22,6 +23,7 @@ GuiSplugView::GuiSplugView(const YAML::Node& node)
     if (!_node.IsMap())
         throw runtime_error("GuiSplugView: node is not a map");
 
+    this->add_child("pebPatch", "PEB", make_unique<GuiSplugPebPatch>(_node["pebPatch"]));
     this->add_child("dllInjector", "DLL注入", make_unique<GuiSplugDllInjector>(_node["dllInjector"]));
     this->add_child("inlineHook", "Inline Hook", make_unique<GuiSplugInlineHook>(_node["inlineHook"]));
     this->add_child("keyValue", "键值配置", make_unique<GuiSplugKeyValue>(_node["keyValue"]));

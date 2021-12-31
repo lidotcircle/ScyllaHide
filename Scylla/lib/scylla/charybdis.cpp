@@ -5,6 +5,7 @@
 #include "scylla/splug/inline_hook.h"
 #include "scylla/splug/key_value.h"
 #include "scylla/splug/exchange.h"
+#include "scylla/splug/peb_patch.h"
 #include <yaml-cpp/yaml.h>
 #include <stdexcept>
 using namespace std;
@@ -21,6 +22,7 @@ Charybdis::Charybdis(WinProcess_t process)
     m_splug_manager->add_splug("keyValue",    [](auto ctx) { return make_unique<SPlugKeyValue>(ctx); });
     m_splug_manager->add_splug("inlineHook",  [](auto ctx) { return make_unique<SPlugInlineHook>(ctx); });
     m_splug_manager->add_splug("exchange",    [](auto ctx) { return make_unique<SPlugExchange>(ctx); });
+    m_splug_manager->add_splug("pebPatch",    [](auto ctx) { return make_unique<SPlugPebPatch>(ctx); });
 }
 
 void Charybdis::doit_string(const string& yaml_string) {

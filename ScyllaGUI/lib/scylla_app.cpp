@@ -31,8 +31,12 @@ ScyllaGuiApp::ScyllaGuiApp(): ImGuiAPP("Scylla Monitor", 500, 700)
     this->m_injected = false;
     this->m_injected_pid = 0;
 
-    YAML::Node empty;
-    this->m_splug_view = make_unique<GuiSplugView>(empty);
+    try {
+        YAML::Node empty;
+        this->m_splug_view = make_unique<GuiSplugView>(empty);
+    } catch (exception& e) {
+        this->error(e.what());
+    }
 
     if (ifstream("scylla.yaml")) {
         m_config_file = "scylla.yaml";
@@ -119,7 +123,8 @@ int ScyllaGuiApp::render_frame()
             h = 30;
         }
         if (ImGui::BeginChild("config", ImVec2(0, h), false)) {
-            this->m_splug_view->show();
+            if (this->m_splug_view)
+                this->m_splug_view->show();
             ImGui::EndChild();
         }
 

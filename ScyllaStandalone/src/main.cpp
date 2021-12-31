@@ -101,10 +101,15 @@ public:
 
     void openFile(const string& filename) {
         try {
-            auto node = YAML::LoadFile(filename);
+            char fullfilename[MAX_PATH];
+            auto n = GetFullPathNameA(filename.c_str(), MAX_PATH, fullfilename, nullptr);
+            if (n == 0 || n > MAX_PATH)
+                throw runtime_error("GetFullPathNameA failed");
+
+            auto node = YAML::LoadFile(fullfilename);
             this->m_splugView = make_unique<GuiSplugView>(node);
-            this->m_fileName = filename;
-            this->info("Loaded file: %s", filename.c_str());
+            this->m_fileName = fullfilename;
+            this->info("Loaded file: %s", fullfilename);
         } catch (exception& e) {
             this->error("Load config failed: %s", e.what());
         }

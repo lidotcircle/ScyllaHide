@@ -2,6 +2,7 @@
 #include "scylla/utils.h"
 #include "utils.hpp"
 #include <iostream>
+#include <thread>
 #include <set>
 #include <string>
 #include <TlHelp32.h>
@@ -107,26 +108,46 @@ const char* GetProcessNameByPid(int pid)
     return processName;
 }
 
-WinProcessNative::suspend_t CreateProcessAndSuspend(const string& cmdline, shared_ptr<WinProcessNative>& process, SuspendingState state)
+shared_ptr<WinProcessNative>
+CreateProcessAndSuspend(const string& exefile, const string& args, 
+                        SuspendingState state, WinProcessNative::suspend_t& suspend)
 {
     PROCESS_INFORMATION pi = { 0 };
     STARTUPINFO si = { 0 };
     DEBUG_EVENT de;
     si.cb = sizeof(si);
+    string cmdline = exefile + " " + args;
 
-    if (!CreateProcess(NULL, (LPSTR)cmdline.c_str(), NULL, NULL, FALSE, DEBUG_ONLY_THIS_PROCESS | DEBUG_PROCESS, NULL, NULL, &si, &pi)) {
+    bool success = false;
+    HANDLE hp = INVALID_HANDLE_VALUE;
+    auto d1 = defer([&] {
+        if (success || hp == INVALID_HANDLE_VALUE)
+            return;
+        
+        TerminateProcess(hp, 1);
+    });
+
+    if (state == SUSPEND_ON_NO_SUSPEND)
+    {
+        if (!CreateProcessA(NULL, (LPSTR)cmdline.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+            cerr << "CreateProcess failed: " << GetLastErrorAsString() << endl;
+            return nullptr;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        auto process = make_shared<WinProcessNative>(pi.dwProcessId);
+        success = true;
+        return process;
+    }
+
+    if (!CreateProcessA(NULL, (LPSTR)cmdline.c_str(), NULL, NULL, FALSE, DEBUG_ONLY_THIS_PROCESS | DEBUG_PROCESS, NULL, NULL, &si, &pi)) {
         cerr << "CreateProcess failed: " << GetLastError() << endl;
         return nullptr;
     }
+    hp = pi.hProcess;
+
     set<string> ntkernel = { "ntdll.dll", "kernel32.dll" };
-    char imageName[MAX_PATH];
-    auto pathLen = GetModuleFileNameEx(pi.hProcess, nullptr, imageName, MAX_PATH);
-    if (pathLen == 0) {
-        cerr << "GetProcessImageFileName failed: " << GetLastError() << endl;
-        return nullptr;
-    }
-    const auto imagePath = string(imageName, pathLen);
-    auto mainmod = MemoryMapPEFile(imagePath);
+    auto mainmod = MemoryMapPEFile(exefile);
     auto imports = mainmod.imports();
     set<string> require_dlls;
     for (auto& i : imports) {
@@ -191,12 +212,12 @@ WinProcessNative::suspend_t CreateProcessAndSuspend(const string& cmdline, share
         ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
     }
 
-    process = make_shared<WinProcessNative>(pi.dwProcessId);
+    auto process = make_shared<WinProcessNative>(pi.dwProcessId);
 
     char originChar = '\0';
     WinProcessNative::addr_t entrypoint;
     if (state == SUSPEND_ON_ENTRYPOINT) {
-        auto exemod = process->find_module(imagePath);
+        auto exemod = process->find_module(exefile);
         entrypoint = exemod->baseaddr() + exemod->header().entrypointRVA();
         originChar = process->get_at(entrypoint);
         process->set_at(entrypoint, '\xcc');
@@ -264,7 +285,11 @@ WinProcessNative::suspend_t CreateProcessAndSuspend(const string& cmdline, share
         ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
     }
 
-    auto suspend = process->suspendThread();
+    auto s = process->suspendThread();
+    if (s == nullptr) {
+        cerr << "suspendThread failed: " << GetLastError() << endl;
+        return nullptr;
+    }
 
     if (state == SUSPEND_ON_ENTRYPOINT) {
         process->set_at(entrypoint, originChar);
@@ -276,7 +301,9 @@ WinProcessNative::suspend_t CreateProcessAndSuspend(const string& cmdline, share
         return nullptr;
     }
 
-    return suspend;
+    suspend = std::move(s);
+    success = true;
+    return process;
 }
 
 bool SetDebugPrivileges()

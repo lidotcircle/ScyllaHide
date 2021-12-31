@@ -10,13 +10,15 @@ int GetPidByProcessName(const std::string& processName);
 const char* GetProcessNameByPid(int pid);
 
 enum SuspendingState {
+    SUSPEND_ON_NO_SUSPEND,
     SUSPEND_ON_NTDLL_KERNEL32_LOADED,
     SUSPEND_ON_ALL_MODULE_LOADED,
     SUSPEND_ON_SYSTEM_BREAKPOINT,
     SUSPEND_ON_ENTRYPOINT,
 };
-WinProcessNative::suspend_t CreateProcessAndSuspend(
-    const std::string& cmdline, std::shared_ptr<WinProcessNative>& process, SuspendingState state);
+std::shared_ptr<WinProcessNative>
+CreateProcessAndSuspend(const std::string& exefile, const std::string& args, 
+                        SuspendingState state, WinProcessNative::suspend_t& suspend);
 
 bool SetDebugPrivileges();
 bool EnablePrivilege(LPCTSTR lpszPrivilegeName, BOOL bEnable);

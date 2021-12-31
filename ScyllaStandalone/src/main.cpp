@@ -40,6 +40,9 @@ private:
     int m_prev_pid;
     string process_name_by_pid;
 
+    int m_suspending_state_index;
+    SuspendingState m_suspending_state;
+
     bool m_injected;
     int  m_injected_pid;
     shared_ptr<WinProcessNative> m_process;
@@ -59,6 +62,7 @@ private:
     void process_name_widget();
     void process_id_widget();
 
+    void suspend_mode_widget();
     void log_window();
 
     bool inject_process();
@@ -86,6 +90,9 @@ public:
  
         this->m_recieve_log = true;
         this->m_show_log_window = false;
+
+        this->m_suspending_state_index = 0;
+        this->m_suspending_state = SuspendingState::SUSPEND_ON_NO_SUSPEND;
 
         this->m_injected = false;
         this->m_injected_pid = 0;
@@ -188,8 +195,8 @@ int ScyllaAPP::render_frame() {
         ImGui::Spacing();
 
         auto h = ImGui::GetWindowHeight();
-        if (h > (210 + 30)) {
-            h -= (210 + 30);
+        if (h > (240 + 30)) {
+            h -= (240 + 30);
         } else {
             h = 30;
         }
@@ -255,6 +262,9 @@ void ScyllaAPP::child_window_control()
     ImGui::Separator();
     ImGui::Spacing();
 
+    this->suspend_mode_widget();
+    ImGui::Spacing();
+
     if (ImGui::Button("运行")) {
         this->m_injected = this->inject_process();
     }
@@ -273,6 +283,64 @@ void ScyllaAPP::child_window_control()
 
     ImGui::SameLine();
     ImGui::Checkbox("接收日志", &m_recieve_log);
+}
+
+void ScyllaAPP::suspend_mode_widget() {
+    static const char* suspendon[] = {
+        "不暂停",
+        "加载 kernel32.dll 后",
+        "加载所有 dll 后",
+        "系统断点",
+        "程序入口 (EntryPoint)",
+    };
+    static SuspendingState suspendon_ss[] = {
+        SUSPEND_ON_NO_SUSPEND,
+        SUSPEND_ON_NTDLL_KERNEL32_LOADED,
+        SUSPEND_ON_ALL_MODULE_LOADED,
+        SUSPEND_ON_SYSTEM_BREAKPOINT,
+        SUSPEND_ON_ENTRYPOINT,
+    };
+
+    static const char* suspendon2[] = {
+        "不暂停",
+        "暂停",
+    };
+    static SuspendingState suspendon2_ss[] = {
+        SUSPEND_ON_NO_SUSPEND,
+        SUSPEND_ON_ENTRYPOINT,
+    };
+
+    auto combo_op = suspendon2;
+    auto combo_ss = suspendon2_ss;
+    size_t combon = sizeof(suspendon2) / sizeof(suspendon2[0]);
+    if (this->m_mode == RunningMode_CMDLine) {
+        combo_op = suspendon;
+        combo_ss = suspendon_ss;
+        combon = sizeof(suspendon) / sizeof(suspendon[0]);
+    }
+
+    if (this->m_suspending_state_index >= combon)
+        this->m_suspending_state_index = 0;
+
+    auto index = this->m_suspending_state_index;
+    if (ImGui::BeginCombo("暂停模式", combo_op[index])) {
+        for (int i = 0; i < combon; i++) {
+            const bool is_selected = (i == index);
+            if (ImGui::Selectable(combo_op[i], is_selected)) {
+                this->m_suspending_state_index = i;
+                this->m_suspending_state = combo_ss[i];
+            }
+            if (is_selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::Text("是否暂停程序再进行操作");
+        ImGui::Text("某些暂停模式可能导致远程线程注入DLL出现死锁");
+        ImGui::EndTooltip();
+    }
 }
 
 void ScyllaAPP::new_process_widget() {
@@ -341,13 +409,21 @@ void ScyllaAPP::log_window() {
 
 bool ScyllaAPP::inject_process() {
     WinProcessNative::suspend_t suspend_state;
+    SuspendingState sstate = this->m_suspending_state;
+    bool need_suspend = sstate != SUSPEND_ON_NO_SUSPEND;
 
     if (this->m_mode == RunningMode_CMDLine) {
         string _exe(m_executable.get());
         string _cmdline(m_cmdline.get());
-        suspend_state = CreateProcessAndSuspend(_exe + " " + _cmdline, this->m_process, SUSPEND_ON_ENTRYPOINT);
+        try {
+            this->m_process = nullptr;
+            this->m_process = CreateProcessAndSuspend(_exe, _cmdline, sstate, suspend_state);
+        } catch (exception& e) {
+            this->error("%s", e.what());
+            return false;
+        }
 
-        if (!suspend_state) {
+        if (!this->m_process) {
             this->error("创建新进程失败");
             return false;
         }
@@ -377,7 +453,7 @@ bool ScyllaAPP::inject_process() {
         return false;
     }
 
-    if (!suspend_state) {
+    if (need_suspend && !suspend_state) {
         suspend_state = this->m_process->suspendThread();
         if (!suspend_state) {
             this->warn("暂停线程失败");
@@ -402,7 +478,8 @@ bool ScyllaAPP::inject_process() {
 
         this->m_charybdis->doit(this->m_splugView->getNode());
         this->m_injected = true;
-        if (!this->m_process->resumeThread(std::move(suspend_state))) {
+
+        if (suspend_state && !this->m_process->resumeThread(std::move(suspend_state))) {
             this->warn("恢复线程失败");
             return false;
         }

@@ -31,7 +31,7 @@ void SPlugPebPatch::doit(const YAML::Node& node) {
 #ifndef _WIN64
     shared_ptr<scl::PEB64> peb64;
     if (iswow64) {
-        auto peb64 = scl::Wow64GetPeb64(process->rawhandle());
+        peb64 = scl::Wow64GetPeb64(process->rawhandle());
         if (peb64 == nullptr)
             throw std::runtime_error("SPlugPebPatch::doit: failed to get peb64");
     }

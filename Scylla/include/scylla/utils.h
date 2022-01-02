@@ -3,7 +3,9 @@
 
 #include <string>
 #include <memory>
+#include <vector>
 #include <Windows.h>
+#include <TlHelp32.h>
 #include "process/win_process_native.h"
 
 int GetPidByProcessName(const std::string& processName);
@@ -29,5 +31,7 @@ std::string GetLastErrorAsString();
 
 const char* ChooserFile(const char* filter);
 const char* SaveFileTo(const char* filter, const std::string& default);
+
+std::vector<PROCESSENTRY32> GetProcessList();
 
 #endif // _SCYLLA_UTILS_H_

@@ -401,3 +401,22 @@ string GetLastErrorAsString() {
 
     return message;
 }
+
+vector<PROCESSENTRY32> GetProcessList()
+{
+    vector<PROCESSENTRY32> ret;
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnapshot == INVALID_HANDLE_VALUE)
+        throw runtime_error("CreateToolhelp32Snapshot failed: " + GetLastErrorAsString());
+    auto d1 = defer([&]() { CloseHandle(hSnapshot); });
+
+    PROCESSENTRY32 pe;
+    pe.dwSize = sizeof(PROCESSENTRY32);
+    if (!Process32First(hSnapshot, &pe))
+        return ret;
+
+    do {
+        ret.push_back(pe);
+    } while (Process32Next(hSnapshot, &pe));
+    return ret;
+}

@@ -2,22 +2,17 @@
 #define _SCYLLA_GUI_YAML_NODE_H_
 
 #include <yaml-cpp/yaml.h>
+#include "./ui_element.h"
 
 
-class GuiYamlNode
+class GuiYamlNode: public UIElement
 {
-private:
-    bool m_visible;
-
 public:
     GuiYamlNode();
 
     virtual YAML::Node getNode() = 0;
 
-    virtual bool show() = 0;
-    bool& visibility();
-
-    virtual ~GuiYamlNode();
+    virtual ~GuiYamlNode() override;
 };
 
 #endif // _SCYLLA_GUI_YAML_NODE_H_

@@ -8,7 +8,7 @@ using namespace std;
 #define MAX_CMDLINE_ARGS_LEN 1024
 
 
-ScyllaGuiApp::ScyllaGuiApp(): ImGuiAPP("Scylla Monitor", 500, 700)
+ScyllaGuiApp::ScyllaGuiApp(): ImGuiAPP("Scylla Monitor", 500, 700), m_remote_log_window("Remote Log Window")
 {
     this->m_mode = RunningMode_CMDLine;
     m_executable = shared_ptr<char>(new char[MAX_PATH], std::default_delete<char[]>());
@@ -19,11 +19,7 @@ ScyllaGuiApp::ScyllaGuiApp(): ImGuiAPP("Scylla Monitor", 500, 700)
     m_process_name.get()[0] = '\0';
     this->m_pid = 0;
 
-    this->m_remote_logs_pageindex = 1;
-    this->m_remote_logs_page_size = 10;
-    this->m_remote_logs_page_size_input = 10;
-    this->m_recieve_remote_log = true;
-    this->m_show_remote_log_window = false;
+    this->m_receive_remote_log = true;
 
     this->m_suspending_state_index = 0;
     this->m_suspending_state = SuspendingState::SUSPEND_ON_NO_SUSPEND;
@@ -136,7 +132,7 @@ int ScyllaGuiApp::render_frame()
             ImGui::EndChild();
         }
 
-       this->window_remote_log();
+        this->m_remote_log_window.show();
         
         ImGui::End();
     }
@@ -240,10 +236,10 @@ void ScyllaGuiApp::child_window_control()
         ImGui::EndDisabled();
 
     ImGui::SameLine();
-    ImGui::Checkbox("显示日志窗口", &m_show_remote_log_window);
+    ImGui::Checkbox("显示日志窗口", &this->m_remote_log_window.visibility());
 
     ImGui::SameLine();
-    ImGui::Checkbox("接收日志", &m_recieve_remote_log);
+    ImGui::Checkbox("接收日志", &m_receive_remote_log);
 }
 
 void ScyllaGuiApp::widget_operation_mode()
@@ -381,142 +377,6 @@ void ScyllaGuiApp::widget_suspend_mod()
     }
 }
 
-class pagination_info {
-private:
-    size_t total_count;
-    size_t page_size;
-    int    page_index;
-
-public:
-    pagination_info() = delete;
-    pagination_info(size_t total_count, size_t page_size, int page_index)
-        : total_count(total_count), page_size(page_size), page_index(page_index)
-    {
-        page_count = total_count / page_size;
-        if (total_count % page_size != 0)
-            page_count++;
-        
-        if (page_index < 0)
-            page_index += (page_count + 1);
-
-        if (page_index > page_count || page_index == 0)
-            page_index = 1;
-
-        abs_page_index = page_index;
-        begin_index = (page_index - 1) * page_size;
-        end_index = begin_index + page_size;
-        if (end_index > total_count)
-            end_index = total_count;
-    }
-
-    size_t page_count;
-    size_t abs_page_index;
-    size_t begin_index;
-    size_t end_index;
-};
-
-void ScyllaGuiApp::window_remote_log()
-{
-    if (!this->m_show_remote_log_window)
-        return;
-    lock_guard<std::mutex> lck(this->m_remote_logs_mutex);
-
-    pagination_info paginfo(this->m_remote_logs.size(), this->m_remote_logs_page_size, this->m_remote_logs_pageindex);
-    size_t beg = paginfo.begin_index;
-    size_t end = paginfo.end_index;
-
-    if (ImGui::Begin("Log Window", &this->m_show_remote_log_window,
-                     ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
-    {
-        auto win_size_y = ImGui::GetWindowHeight();
-        auto textheight = ImGui::GetTextLineHeight();
-
-        if (ImGui::BeginChild("Logs", ImVec2(0, win_size_y - textheight * 6.5), false)) {
-            for (size_t i = beg; i < end; i++) {
-                auto& log = this->m_remote_logs[i];
-                ImGui::Text("%s", log.c_str());
-                ImGui::Separator();
-                ImGui::Spacing();
-            }
-
-            ImGui::EndChild();
-        }
-
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-        this->widget_remote_log_pagination();
-        ImGui::End();
-    }
-}
-
-void ScyllaGuiApp::widget_remote_log_pagination()
-{
-    pagination_info paginfo(this->m_remote_logs.size(), this->m_remote_logs_page_size, this->m_remote_logs_pageindex);
-    auto width = ImGui::GetContentRegionAvail().x;
-    auto gluewidth = (width - 150) / 2;
-    ImGui::Dummy(ImVec2(gluewidth, 0));
-    ImGui::SameLine();
-
-    if (paginfo.abs_page_index == 1)
-        ImGui::BeginDisabled();
-    if (ImGui::Button("<<"))
-        this->m_remote_logs_pageindex = 1;
-    if (paginfo.abs_page_index == 1)
-        ImGui::EndDisabled();
-    
-    if (paginfo.abs_page_index > 1) {
-        ImGui::SameLine();
-        if (ImGui::Button(to_string(paginfo.abs_page_index - 1).c_str()))
-            this->m_remote_logs_pageindex = paginfo.abs_page_index - 1;
-    }
-
-    ImGui::SameLine();
-    ImGui::Text("%d/%d", paginfo.abs_page_index, paginfo.page_count);
-
-    if (paginfo.abs_page_index < paginfo.page_count) {
-        ImGui::SameLine();
-        if (ImGui::Button(to_string(paginfo.abs_page_index + 1).c_str()))
-            this->m_remote_logs_pageindex = paginfo.abs_page_index + 1;
-    }
-
-    ImGui::SameLine();
-    if (paginfo.abs_page_index == paginfo.page_count)
-        ImGui::BeginDisabled();
-    if (ImGui::Button(">>"))
-        this->m_remote_logs_pageindex = -1;
-    if (paginfo.abs_page_index == paginfo.page_count)
-        ImGui::EndDisabled();
-    
-    ImGui::SameLine();
-    ImGui::Text("每页%d条", this->m_remote_logs_page_size);
-
-    ImGui::Dummy(ImVec2(gluewidth, 0));
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(50);
-    if (ImGui::InputInt("##page_size", &this->m_remote_logs_page_size_input, 0)) {
-        if (this->m_remote_logs_page_size_input < 8)
-            this->m_remote_logs_page_size_input = 8;
-        
-        if (this->m_remote_logs_page_size_input > 200)
-            this->m_remote_logs_page_size_input = 200;
-    }
-    if (ImGui::IsItemHovered()) {
-        ImGui::BeginTooltip();
-        ImGui::Text("输入每页显示的条目数, 8 ~ 200");
-        ImGui::EndTooltip();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("确认")) {
-        this->m_remote_logs_page_size = this->m_remote_logs_page_size_input;
-        this->m_remote_logs_pageindex = 1;
-    }
-
-    ImGui::SameLine();
-    if (ImGui::Button("清空"))
-        this->m_remote_logs.clear();
-}
-
 bool ScyllaGuiApp::operation_doit()
 {
     WinProcessNative::suspend_t suspend_state;
@@ -577,11 +437,10 @@ bool ScyllaGuiApp::operation_doit()
     log_server_config->is_callback_log_server = true;
     log_server_config->on_log = [](const char* log, int len, void* data) {
         auto self = static_cast<ScyllaGuiApp*>(data);
-        if (!self->m_recieve_remote_log)
+        if (!self->m_receive_remote_log)
             return;
 
-        lock_guard<std::mutex> lck(self->m_remote_logs_mutex);
-        self->m_remote_logs.push_back(string(log, len));
+        self->m_remote_log_window.add_log(string(log, len));
     };
 
     try {

@@ -6,6 +6,7 @@
 #include "scylla/charybdis.h"
 #include "./imgui_app.h"
 #include "./splug/splug_view.h"
+#include "./widget/log_window.h"
 #include <mutex>
 #include <memory>
 #include <string>
@@ -19,13 +20,8 @@ private:
     std::unique_ptr<GuiSplugView> m_splug_view;
     std::string m_config_file;
 
-    std::mutex m_remote_logs_mutex;
-    std::vector<std::string> m_remote_logs;
-    int m_remote_logs_pageindex;
-    int m_remote_logs_page_size;
-    int m_remote_logs_page_size_input;
-    bool m_recieve_remote_log;
-    bool m_show_remote_log_window;
+    LogWindow m_remote_log_window;
+    bool m_receive_remote_log;
 
     enum RunningMode {
         RunningMode_CMDLine = 0,
@@ -64,9 +60,6 @@ private:
         void widget_process_name();
         void widget_process_id();
         void widget_suspend_mod();
-
-    void window_remote_log();
-        void widget_remote_log_pagination();
 /** ------- End Renderer Functions -------
  *  -------------------------------------- */
 

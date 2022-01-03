@@ -7,6 +7,7 @@
 #include "./imgui_app.h"
 #include "./splug/splug_view.h"
 #include "./widget/log_window.h"
+#include "./widget/process_select_window.h"
 #include <mutex>
 #include <memory>
 #include <string>
@@ -36,6 +37,9 @@ private:
     int m_pid;
     int m_prev_pid;
     std::string process_name_by_pid;
+
+    ProcessSelectWindow m_process_select_window;
+    bool m_wait_for_process_select;
 
     int m_suspending_state_index;
     SuspendingState m_suspending_state;

@@ -19,6 +19,8 @@ ScyllaGuiApp::ScyllaGuiApp(): ImGuiAPP("Scylla Monitor", 500, 700), m_remote_log
     m_process_name.get()[0] = '\0';
     this->m_pid = 0;
 
+    this->m_wait_for_process_select = false;
+
     this->m_receive_remote_log = true;
 
     this->m_suspending_state_index = 0;
@@ -298,6 +300,21 @@ void ScyllaGuiApp::widget_process_name()
 void ScyllaGuiApp::widget_process_id()
 {
     ImGui::InputInt("进程ID", &this->m_pid);
+    ImGui::SameLine();
+    if (ImGui::Button("***")) {
+        this->m_process_select_window.refresh_processes();
+        this->m_wait_for_process_select = true;
+    }
+    
+    if (this->m_wait_for_process_select && !this->m_process_select_window.show()) {
+        auto& s = this->m_process_select_window.get_selected();
+        this->m_wait_for_process_select = false;
+        if (s.m_pid != 0) {
+            this->m_pid = s.m_pid;
+            this->m_prev_pid = s.m_pid;
+            this->process_name_by_pid = s.m_name;
+        }
+    }
 
     if (this->m_pid < 0)
         this->m_pid = 0;

@@ -404,6 +404,21 @@ string GetLastErrorAsString() {
 
 vector<PROCESSENTRY32> GetProcessList()
 {
+    static bool this_is_wow64 = false;
+#ifdef _WIN64
+    static bool this_is_wow64_initialized = true;
+    static bool is_64bit = true;
+#else
+    static bool this_is_wow64_initialized = false;
+    static bool is_64bit = false;
+    if (!this_is_wow64_initialized) {
+        BOOL isWow64 = FALSE;
+        IsWow64Process(GetCurrentProcess(), &isWow64);
+        this_is_wow64 = isWow64;
+        this_is_wow64_initialized = true;
+    }
+#endif
+
     vector<PROCESSENTRY32> ret;
     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (hSnapshot == INVALID_HANDLE_VALUE)
@@ -416,6 +431,20 @@ vector<PROCESSENTRY32> GetProcessList()
         return ret;
 
     do {
+        if (this_is_wow64 || is_64bit) {
+            auto handle = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pe.th32ProcessID);
+            if (handle == INVALID_HANDLE_VALUE)
+                continue;
+            
+            auto d2 = defer([&]() { CloseHandle(handle); });
+            BOOL iswow64 = FALSE;
+            if (!IsWow64Process(handle, &iswow64))
+                continue;
+
+            bool is_wow64 = iswow64;
+            if (this_is_wow64 != is_wow64)
+                continue;
+        }
         ret.push_back(pe);
     } while (Process32Next(hSnapshot, &pe));
     return ret;

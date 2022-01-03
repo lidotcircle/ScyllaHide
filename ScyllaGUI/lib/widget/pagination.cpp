@@ -143,4 +143,6 @@ bool Pagination::show() {
         this->m_pagesize = this->m_pagesize_input;
         this->m_pageindex = 1;
     }
+
+    return true;
 }

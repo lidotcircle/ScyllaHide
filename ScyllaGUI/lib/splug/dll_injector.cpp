@@ -1,9 +1,13 @@
+#include "process/memory_map_pefile.h"
+#include "scylla/splug/dll_injector.h"
 #include "scyllagui/splug/dll_injector.h"
 #include "scylla_constants.h"
 #include "scylla/utils.h"
+#include "str_utils.h"
 #include <imgui.h>
 #include <stdexcept>
 using namespace std;
+using namespace scylla;
 
 #define MAX_ADDR_LEN 256
 
@@ -37,6 +41,26 @@ GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node) {
             found_antianti = true;
         }
 
+        try {
+            shared_ptr<MemoryMapPEFile> pefile;
+            if (dll_path == ANTIANTI_DLL) {
+                vector<char> data(hook_library_data, hook_library_data + hook_library_data_size);
+                pefile = make_shared<MemoryMapPEFile>(data);
+            } else {
+                pefile = make_shared<MemoryMapPEFile>(dll_path);
+            }
+
+            auto _exports = pefile->exports();
+            vector<string> export_names;
+            for (auto& e: _exports)
+                export_names.push_back(e.second.first);
+
+            state.m_info_window = PEInfoWindow(export_names, canonicalizeModuleName(dll_path), pefile->header());
+            state.m_is_valid = true;
+        } catch (exception&) {
+            state.m_is_valid = false;
+        }
+
         if (dll_path.empty())
             throw std::runtime_error("GuiSplugDllInjector: dll_path is empty");
         
@@ -57,6 +81,20 @@ GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node) {
         state.stealthy = false;
         state.dll_path = shared_ptr<char>(new char[MAX_ADDR_LEN], std::default_delete<char[]>());
         state.exchange = shared_ptr<char>(new char[MAX_ADDR_LEN], std::default_delete<char[]>());
+
+        try {
+            vector<char> data(hook_library_data, hook_library_data + hook_library_data_size);
+            auto pefile = make_shared<MemoryMapPEFile>(data);
+            auto _exports = pefile->exports();
+            vector<string> export_names;
+            for (auto& e: _exports)
+                export_names.push_back(e.second.first);
+
+            state.m_info_window = PEInfoWindow(export_names, ANTIANTI_DLL, pefile->header());
+            state.m_is_valid = true;
+        } catch (exception&) {
+            state.m_is_valid = false;
+        }
 
         strncpy(state.dll_path.get(), ANTIANTI_DLL, MAX_ADDR_LEN);
         strncpy(state.exchange.get(), ANTIANTI_DLL_EXCHANGE_SYMBOL, MAX_ADDR_LEN);
@@ -109,12 +147,24 @@ bool GuiSplugDllInjector::show() {
             continue;
         }
 
+        bool is_valid = state.m_is_valid;
+        if (!is_valid)
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+
         ImVec2 dummy(20, 0);
         ImGui::Checkbox("启用", &state.enable);
         ImGui::SameLine();
         ImGui::Dummy(dummy);
         ImGui::SameLine();
         ImGui::Checkbox("内存注入", &state.stealthy);
+        if (state.m_is_valid) {
+            ImGui::SameLine();
+            ImGui::Checkbox("模块信息窗口", &state.m_info_window.visibility());
+            state.m_info_window.show();
+        }
+
+        if (!is_valid)
+            ImGui::PopStyleColor();
 
         if (is_internal)
             ImGui::BeginDisabled();
@@ -168,6 +218,33 @@ bool GuiSplugDllInjector::show() {
         strncpy(state.dll_path.get(), "", MAX_ADDR_LEN);
         strncpy(state.exchange.get(), "", MAX_ADDR_LEN);
         state.deleted = false;
+
+        for (auto& p: this->m_dlls) {
+            auto n = canonicalizeModuleName(p.dll_path.get());
+
+            if (n == canonicalizeModuleName(state.dll_path.get())) {
+                if (ImGui::BeginPopupModal("Same DLL Error")) {
+                    ImGui::Text("已存在相同的DLL");
+                    ImGui::EndPopup();
+                }
+                ImGui::OpenPopup("Same DLL Error");
+                return true;
+            }
+        }
+
+        try {
+            auto pefile = make_shared<MemoryMapPEFile>(state.dll_path.get());
+            auto _exports = pefile->exports();
+            vector<string> export_names;
+            for (auto& e: _exports)
+                export_names.push_back(e.second.first);
+
+            state.m_info_window = PEInfoWindow(export_names, canonicalizeModuleName(state.dll_path.get()), pefile->header());
+            state.m_is_valid = true;
+        } catch (exception&) {
+            state.m_is_valid = false;
+        }
+
         this->m_dlls.push_back(state);
     }
 

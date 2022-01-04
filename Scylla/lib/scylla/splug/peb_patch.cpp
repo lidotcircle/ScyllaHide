@@ -21,6 +21,7 @@ void SPlugPebPatch::doit(const YAML::Node& node) {
         throw std::runtime_error("SPlugPebPatch::doit: node is not a map");
 
     auto& ctx = this->context();
+    auto logger = ctx->log_client();
     auto process = ctx->process();
     bool iswow64 = process->isWow64Process();
 
@@ -38,6 +39,7 @@ void SPlugPebPatch::doit(const YAML::Node& node) {
 #endif 
    
     if (node["BeingDebugged"].as<bool>(false)) {
+        logger->info("patch peb: BeingDebugged");
 
         peb->BeingDebugged = FALSE;
 #ifndef _WIN64
@@ -47,6 +49,8 @@ void SPlugPebPatch::doit(const YAML::Node& node) {
     }
     
     if (node["NtGlobalFlag"].as<bool>(false)) {
+        logger->info("patch peb: NtGlobalFlag");
+
         peb->NtGlobalFlag &= ~0x70;
 #ifndef _WIN64
         if (iswow64)
@@ -55,6 +59,7 @@ void SPlugPebPatch::doit(const YAML::Node& node) {
     }
     
     if (node["ProcessParameters"].as<bool>(false)) {
+        logger->info("patch peb: ProcessParameters");
 
         if (!scl::PebPatchProcessParameters(peb.get(), process->rawhandle()))
             throw std::runtime_error("SPlugPebPatch::doit: failed to patch process parameters");
@@ -67,6 +72,8 @@ void SPlugPebPatch::doit(const YAML::Node& node) {
     }
 
     if (node["HeapFlags"].as<bool>(false)) {
+        logger->info("patch peb: HeapFlags");
+
         if (!scl::PebPatchHeapFlags(peb.get(), process->rawhandle()))
             throw std::runtime_error("SPlugPebPatch::doit: failed to patch heap flags");
 
@@ -77,6 +84,7 @@ void SPlugPebPatch::doit(const YAML::Node& node) {
     }
 
     if (node["OsBuildNumber"].as<bool>(false)) {
+        logger->info("patch peb: OsBuildNumber");
         peb->OSBuildNumber++;
 
 #ifndef _WIN64

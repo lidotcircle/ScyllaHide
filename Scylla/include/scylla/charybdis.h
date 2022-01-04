@@ -26,6 +26,8 @@ public:
     std::shared_ptr<SPlugConfig> get_splug_config();
     const std::shared_ptr<SPlugConfig> get_splug_config() const;
     void set_splug_config(std::shared_ptr<SPlugConfig> confit);
+
+    void set_log_client(std::shared_ptr<LogClient> log_client);
 };
 
 } // namespace scylla

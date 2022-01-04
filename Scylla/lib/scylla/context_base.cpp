@@ -1,4 +1,5 @@
 #include "scylla/context_base.h"
+#include "logger/log_client_console.h"
 #include <stdexcept>
 using namespace std;
 
@@ -12,6 +13,7 @@ ScyllaContextBase::ScyllaContextBase(std::shared_ptr<WinProcessNative> process)
     : m_process(process)
     , m_exchange(process)
     , m_splug_config(make_shared<SPlugConfig>())
+    , m_log_client(make_shared<LogClientConsole>())
 {
 }
 
@@ -69,6 +71,19 @@ const shared_ptr<ScyllaContextItem> ScyllaContextBase::get_item(const string& na
         return nullptr;
 
     return it->second;
+}
+
+std::shared_ptr<LogClient> ScyllaContextBase::log_client()
+{
+    return m_log_client;
+}
+const std::shared_ptr<LogClient> ScyllaContextBase::log_client() const
+{
+    return m_log_client;
+}
+void ScyllaContextBase::set_log_client(std::shared_ptr<LogClient> log_client)
+{
+    this->m_log_client = log_client;
 }
 
 ScyllaContextBase::~ScyllaContextBase() {}

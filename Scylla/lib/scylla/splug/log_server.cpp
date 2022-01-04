@@ -58,6 +58,7 @@ void SPlugLogServer::doit(const YAML::Node& node) {
 
     auto ctx = this->context();
     auto& exch = ctx->exchange();
+    auto logger = ctx->log_client();
     auto config = ctx->splug_config();
     auto _lconfig = config->get("logger");
     auto lconfig = dynamic_pointer_cast<LogServerConfig>(_lconfig);
@@ -70,15 +71,19 @@ void SPlugLogServer::doit(const YAML::Node& node) {
 
     unique_ptr<UDPLogServer> server;
     if (lconfig == nullptr || !lconfig->is_callback_log_server) {
+        logger->info("SPlugLogServer: using UDPConsoleLogServer");
         server = make_unique<UDPConsoleLogServer>(htons(port), htonl(addr));
     } else {
+        logger->info("SPlugLogServer: using UDPCallbackLogServer");
         server = make_unique<UDPCallbackLogServer>(htons(port), htonl(addr), lconfig->on_log, lconfig->data);
     }
 
     exch.set_udp_port(server->GetPort());
     exch.set_udp_addr(server->GetAddr());
+    logger->info("SPlugLogServer: listen udp socket: %s:%d", addr_str.c_str(), server->GetPort());
     this->m_log_server = move(server);
 
+    logger->info("SPlugLogServer: creating new thread for polling new message");
     this->m_log_server_poll_thread = make_unique<thread>([this] {
         this->m_log_server->poll();
     });

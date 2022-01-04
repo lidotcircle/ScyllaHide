@@ -6,6 +6,7 @@
 #include <string>
 #include "./exchange_mx.h"
 #include "./splug_config.h"
+#include "logger/log_client.h"
 
 class WinProcessNative;
 
@@ -23,6 +24,7 @@ class ScyllaContextBase {
 private:
     std::shared_ptr<WinProcessNative> m_process;
     std::shared_ptr<SPlugConfig> m_splug_config;
+    std::shared_ptr<LogClient> m_log_client;
     ExchangeDataMX m_exchange;
     std::map<std::string, std::shared_ptr<ScyllaContextItem>> m_items;
 
@@ -62,6 +64,10 @@ public:
 
         return std::dynamic_pointer_cast<T>(it->second);
     }
+
+    std::shared_ptr<LogClient> log_client();
+    const std::shared_ptr<LogClient> log_client() const;
+    void set_log_client(std::shared_ptr<LogClient> log_client);
 
     virtual ~ScyllaContextBase();
 };

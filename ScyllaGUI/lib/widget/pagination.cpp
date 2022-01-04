@@ -41,7 +41,7 @@ public:
 Pagination::Pagination()
 {
     m_pagesize = 10;
-    m_pageindex = 0;
+    m_pageindex = -1;
     m_pagesize_input = 10;
     this->set_records(0);
 }

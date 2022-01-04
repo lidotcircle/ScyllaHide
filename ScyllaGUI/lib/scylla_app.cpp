@@ -1,5 +1,6 @@
 #include "scyllagui/scylla_app.h"
 #include "scylla/splug/log_server.h"
+#include "logger/log_client_callback.h"
 #include <imgui.h>
 #include <fstream>
 #include <sstream>
@@ -8,7 +9,10 @@ using namespace std;
 #define MAX_CMDLINE_ARGS_LEN 1024
 
 
-ScyllaGuiApp::ScyllaGuiApp(): ImGuiAPP("Scylla Monitor", 500, 700), m_remote_log_window("Remote Log Window")
+ScyllaGuiApp::ScyllaGuiApp():
+    ImGuiAPP("Scylla Monitor", 500, 700),
+    m_remote_log_window("Remote Log Window"),
+    m_local_log_window("Local Log Window"), m_local_logger(nullptr)
 {
     this->m_mode = RunningMode_CMDLine;
     m_executable = shared_ptr<char>(new char[MAX_PATH], std::default_delete<char[]>());
@@ -22,6 +26,11 @@ ScyllaGuiApp::ScyllaGuiApp(): ImGuiAPP("Scylla Monitor", 500, 700), m_remote_log
     this->m_wait_for_process_select = false;
 
     this->m_receive_remote_log = true;
+    this->m_local_logger = make_shared<LogClientCallback>(
+        [](const char* buf, uint16_t bufsize, void* data) {
+            auto self = static_cast<ScyllaGuiApp*>(data);
+            self->send(buf, bufsize);
+        }, this);
 
     this->m_suspending_state_index = 0;
     this->m_suspending_state = SuspendingState::SUSPEND_ON_NO_SUSPEND;
@@ -135,6 +144,7 @@ int ScyllaGuiApp::render_frame()
         }
 
         this->m_remote_log_window.show();
+        this->m_local_log_window.show();
         
         ImGui::End();
     }
@@ -238,10 +248,13 @@ void ScyllaGuiApp::child_window_control()
         ImGui::EndDisabled();
 
     ImGui::SameLine();
-    ImGui::Checkbox("显示日志窗口", &this->m_remote_log_window.visibility());
+    ImGui::Checkbox("远程日志窗口", &this->m_remote_log_window.visibility());
 
     ImGui::SameLine();
-    ImGui::Checkbox("接收日志", &m_receive_remote_log);
+    ImGui::Checkbox("接收远程日志", &m_receive_remote_log);
+
+    ImGui::SameLine();
+    ImGui::Checkbox("本地日志窗口", &this->m_local_log_window.visibility());
 }
 
 void ScyllaGuiApp::widget_operation_mode()
@@ -464,6 +477,7 @@ bool ScyllaGuiApp::operation_doit()
         this->m_charybdis = make_unique<scylla::Charybdis>(this->m_process);
         auto config = this->m_charybdis->get_splug_config();
         config->set("logger", log_server_config);
+        this->m_charybdis->set_log_client(this->m_local_logger);
 
         this->m_charybdis->doit(this->m_splug_view->getNode());
         this->m_injected = true;
@@ -501,6 +515,7 @@ void ScyllaGuiApp::operation_undo()
 
 void ScyllaGuiApp::send(const char* msg, uint16_t len) {
     this->m_log_msg = string(msg, len);
+    this->m_local_log_window.add_log(this->m_log_msg);
     this->m_log_prev_timestamp = std::chrono::system_clock::now();
 }
 

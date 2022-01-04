@@ -53,3 +53,7 @@ const std::shared_ptr<SPlugConfig> Charybdis::get_splug_config() const {
 void Charybdis::set_splug_config(std::shared_ptr<SPlugConfig> config) {
     this->m_context->set_splug_config(config);
 }
+
+void Charybdis::set_log_client(std::shared_ptr<LogClient> log_client) {
+    this->m_context->set_log_client(log_client);
+}

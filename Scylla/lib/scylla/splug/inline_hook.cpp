@@ -58,6 +58,7 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
         return;
 
     auto ctx = this->context();
+    auto logger = ctx->log_client();
     auto process = ctx->process();
 
     vector<tuple<addr_t,addr_t,string,string>> hooks;
@@ -105,6 +106,9 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
             hooks.push_back(
                 make_tuple(get<0>(original_info), get<0>(hook_info), 
                            get<1>(original_info), get<2>(original_info)));
+        logger->info("inline hook: %s(0x%lx) -> %s(0x%lx)",
+                     original_target.c_str(), (long)get<0>(original_info),
+                     hook_target.c_str(), (long)get<0>(hook_info));
         } catch (const exception& e) {
             throw runtime_error("inline hook rule error: " + string(e.what()));
         }

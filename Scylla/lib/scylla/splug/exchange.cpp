@@ -17,6 +17,7 @@ void SPlugExchange::doit(const YAML::Node& node) {
         return;
 
     auto ctx = this->context();
+    auto logger = ctx->log_client();
     auto& exch = ctx->exchange();
     auto process = ctx->process();
     auto inject_info = ctx->get_item<InjectDLLInfo>("__dll_injection");
@@ -27,6 +28,7 @@ void SPlugExchange::doit(const YAML::Node& node) {
     for (auto& dll : inject_info->dlls) {
         auto& mod = dll.first;
         auto& exch_name = dll.second;
+        logger->info("write exchange data: %s::%s", mod.c_str(), exch_name.c_str());
         auto rmod = process->find_module(mod);
         if (rmod == nullptr)
             throw std::runtime_error("SPlugExchange::doit: module not found '" + mod + "'");

@@ -24,6 +24,9 @@ private:
     LogWindow m_remote_log_window;
     bool m_receive_remote_log;
 
+    LogWindow m_local_log_window;
+    std::shared_ptr<LogClient> m_local_logger;
+
     enum RunningMode {
         RunningMode_CMDLine = 0,
         RunningMode_ProcessName,

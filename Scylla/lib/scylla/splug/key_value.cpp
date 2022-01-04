@@ -15,6 +15,7 @@ void SPlugKeyValue::doit(const YAML::Node& node) {
         throw std::runtime_error("SPlugKeyValue::doit: node is not a map");
     
     auto ctx = this->context();
+    auto logger = ctx->log_client();
     auto& exch = ctx->exchange();
     
     for (auto it = node.begin(); it != node.end(); ++it) {

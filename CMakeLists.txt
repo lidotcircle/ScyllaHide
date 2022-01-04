@@ -20,6 +20,7 @@ add_subdirectory("slogger")
 
 add_subdirectory("Scylla")
 add_subdirectory("HookLibrary")
+add_subdirectory("MonitorLibrary")
 add_subdirectory("InjectorCLI")
 
 add_subdirectory("ScyllaGUI")

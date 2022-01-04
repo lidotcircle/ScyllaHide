@@ -51,7 +51,7 @@ static addr_t parseAddr(const string& str) {
  *  note: address is a hexdecimal number which must start with 0x
  */
 void SPlugInlineHook::doit(const YAML::Node& node) {
-    if (!node.IsMap())
+    if (!node.IsMap() && node.IsDefined())
         throw runtime_error("inline hook rule should be a map");
 
     if (node["disable"].as<bool>(false))
@@ -96,19 +96,23 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
 
         return make_tuple(addr, mod, func);
     };
-    auto add_hook = [&](const string& original_target, const string& hook_target) {
-        if (strStartWith(hook_target, INLINE_HOOK_DISABLE_PREFIX))
-            return;
+    auto add_hook = [&](const string& original_target, const YAML::Node& hook_target) {
+        if (!hook_target.IsMap())
+            throw runtime_error("hook target should be a map");
 
+        if (hook_target["disable"].as<bool>(false))
+            return;
+        
         try {
+            string hook_target_expr = hook_target["hook"].as<string>();
             auto original_info = resolve_expr(original_target);
-            auto hook_info   = resolve_expr(hook_target);
+            auto hook_info   = resolve_expr(hook_target_expr);
             hooks.push_back(
                 make_tuple(get<0>(original_info), get<0>(hook_info), 
                            get<1>(original_info), get<2>(original_info)));
         logger->info("inline hook: %s(0x%lx) -> %s(0x%lx)",
                      original_target.c_str(), (long)get<0>(original_info),
-                     hook_target.c_str(), (long)get<0>(hook_info));
+                     hook_target_expr.c_str(), (long)get<0>(hook_info));
         } catch (const exception& e) {
             throw runtime_error("inline hook rule error: " + string(e.what()));
         }
@@ -122,14 +126,20 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
         if (str == "disable")
             continue;
 
-        if (val.IsMap()) {
+        const bool not_module = str.find("::") != string::npos || 
+                                str.find('#') != string::npos || 
+                                str.find('$') != string::npos;
+
+        if (not_module) {
+            add_hook(str, val);
+        } else {
             for (auto it=val.begin();it!=val.end();it++) {
                 string kn = str;
                 auto k = it->first.as<string>();
                 if (k == "disable")
                     continue;
 
-                auto v = it->second.as<string>();
+                auto v = it->second;
                 if (strStartWith(k, "$") || strStartWith(k, "#")) {
                     kn = kn + k;
                 } else {
@@ -138,10 +148,6 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
 
                 add_hook(kn, v);
             }
-        } else if (val.IsScalar()) {
-            add_hook(str, val.as<string>());
-        } else {
-            throw runtime_error("invalid inline hook rule");
         }
     }
 

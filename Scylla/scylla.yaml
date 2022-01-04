@@ -14,7 +14,15 @@ dllInjector:
 inlineHook:
   disable: false
   ntdll.dll:
-    NtWriteVirtualMemory: HookLibraryx86.dll::_HookedNtWriteVirtualMemory@.*
+    disable: false
+    NtReadVirtualMemory:
+      disable: false
+      hook: antianti.dll::_HookedNtReadVirtualMemory@.*
+      remark: ""
+  ntdll.dll::NtWriteVirtualMemory:
+    disable: true
+    hook: antianti.dll::_HookedNtWriteVirtualMemory@.*
+    remark: ""
 
 keyValue:
   hello: world

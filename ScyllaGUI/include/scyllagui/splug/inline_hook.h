@@ -9,12 +9,22 @@
 
 
 struct HookPairState {
+private:
+    std::string m_old_original;
+    std::string m_old_hook;
+
+public:
+    HookPairState();
+    void revalidate();
+
     std::shared_ptr<char> m_original;
     std::shared_ptr<char> m_hook;
     std::string m_remark;
+    bool m_enable;
+    bool m_valid;
+    bool m_in_module;
     bool m_editing;
     bool m_delete;
-    bool m_enable;
 };
 
 struct HookModule {

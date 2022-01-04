@@ -82,13 +82,14 @@ bool Pagination::show() {
     ImGui::Dummy(ImVec2(gluewidth, 0));
     ImGui::SameLine();
 
-    if (this->m_abs_pageindex == 1)
+    const bool first_page = this->m_abs_pageindex == 1;
+    if (first_page)
         ImGui::BeginDisabled();
     if (ImGui::Button("<<")) {
         this->m_pageindex = 1;
         this->set_records(this->m_total_records);
     }
-    if (this->m_abs_pageindex == 1)
+    if (first_page)
         ImGui::EndDisabled();
     
     if (this->m_abs_pageindex > 1) {
@@ -111,13 +112,14 @@ bool Pagination::show() {
     }
 
     ImGui::SameLine();
-    if (this->m_abs_pageindex == this->m_pagecount)
+    const bool last_page = this->m_abs_pageindex == this->m_pagecount;
+    if (last_page)
         ImGui::BeginDisabled();
     if (ImGui::Button(">>")) {
         this->m_pageindex = -1;
         this->set_records(this->m_total_records);
     }
-    if (this->m_abs_pageindex == this->m_pagecount)
+    if (last_page)
         ImGui::EndDisabled();
     
     ImGui::SameLine();

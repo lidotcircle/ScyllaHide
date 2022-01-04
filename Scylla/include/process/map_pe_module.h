@@ -66,7 +66,7 @@ public:
     std::vector<std::string> sections() const;
     std::shared_ptr<MemoryMap>       section(const std::string& name);
     const std::shared_ptr<MemoryMap> section(const std::string& name) const;
-    const std::string& module_name()  const;
+    virtual const std::string& module_name() const final;
 
     const PEHeader& header() const;
 

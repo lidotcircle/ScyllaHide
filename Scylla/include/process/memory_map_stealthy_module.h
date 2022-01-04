@@ -13,7 +13,6 @@ public:
     using addr_t = typename MapPEModule::addr_t;
 
 private:
-    std::string dll_path;
     std::shared_ptr<MemoryMapWinPage> page;
 
 public:
@@ -28,8 +27,6 @@ public:
     virtual void set_at(addr_t index, char value) override;
 
     virtual void flush() override;
-
-    const std::string& module_name() const;
 };
 
 #endif // _MEMORY_MAP_STEALTHY_MODULE_H_

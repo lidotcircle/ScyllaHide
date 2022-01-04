@@ -273,8 +273,8 @@ void WinProcessNative::refresh_process()
     }
 
     for (auto& module_map: module_maps) {
-        auto mod = std::dynamic_pointer_cast<MemoryMapModule>(module_map);
-        assert(mod && "this map should be module");
+        auto mod = std::dynamic_pointer_cast<MapPEModule>(module_map);
+        assert(mod && "this map should be pe module");
         this->add_module(mod->module_name(), mod);
         this->process_maps.push_back(module_map);
     }
@@ -339,6 +339,8 @@ static string __tolower(const string& str) {
 }
 
 void WinProcessNative::add_module(const string& name, shared_ptr<MapPEModule> module) {
+    if (name.empty())
+        throw runtime_error("module name is empty");
     this->m_modules[this->canonicalize_module_name(name)] = module;
 }
 

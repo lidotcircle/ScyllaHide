@@ -10,10 +10,11 @@ using addr_t = typename MemoryMapStealthyModule::addr_t;
 
 MemoryMapStealthyModule::MemoryMapStealthyModule(
     shared_ptr<MemoryMapWinPage> page,
-    const string& modname): page(page), dll_path(modname) 
+    const string& modname): MapPEModule(modname), page(page) 
 {
-    vector <char> data(MIN_AB(page->size(), 0x1000), 0);
-    for (size_t i = 0; i < page->size(); i++)
+    auto header_size = MIN_AB(page->size(), 0x1000);
+    vector <char> data(header_size, 0);
+    for (size_t i = 0; i < header_size; i++)
         data[i] = page->get_at(i);
 
     PEHeader header(data);
@@ -22,7 +23,7 @@ MemoryMapStealthyModule::MemoryMapStealthyModule(
 
 MemoryMapStealthyModule::MemoryMapStealthyModule(
     shared_ptr<MemoryMapWinPage> page,
-    PEHeader header, const string& modname): page(page), dll_path(modname) 
+    PEHeader header, const string& modname): MapPEModule(modname), page(page)
 {
     this->parse_header(header);
 }
@@ -43,8 +44,4 @@ void MemoryMapStealthyModule::set_at(addr_t index, char value) {
 
 void MemoryMapStealthyModule::flush() {
     page->flush();
-}
-
-const std::string& MemoryMapStealthyModule::module_name() const {
-    return dll_path;
 }

@@ -18,6 +18,42 @@ static string string_trim(string str)
     return str;
 }
 
+DLLInjectState::DLLInjectState():
+    enable(true), stealthy(false),
+    deleted(false), is_internal(false),
+    m_is_valid(false)
+{
+    this->dll_path = shared_ptr<char>(new char[MAX_ADDR_LEN], std::default_delete<char[]>());
+    this->exchange = shared_ptr<char>(new char[MAX_ADDR_LEN], std::default_delete<char[]>());
+    strncpy(this->dll_path.get(), "", MAX_ADDR_LEN);
+    strncpy(this->exchange.get(), "", MAX_ADDR_LEN);
+}
+
+void DLLInjectState::refresh()
+{
+    if (_strnicmp(this->dll_path.get(), this->m_old_dll_path.c_str(), MAX_ADDR_LEN) == 0)
+        return;
+
+    std::string cdll_path(this->dll_path.get());
+    this->m_old_dll_path = cdll_path;
+
+    try {
+        shared_ptr<MemoryMapPEFile> pefile;
+        
+        if (_strnicmp(cdll_path.c_str(), ANTIANTI_DLL, sizeof(ANTIANTI_DLL)) == 0) {
+            vector<char> data(hook_library_data, hook_library_data + hook_library_data_size);
+            pefile = make_shared<MemoryMapPEFile>(data);
+        } else {
+            pefile = make_shared<MemoryMapPEFile>(cdll_path);
+        }
+
+        this->m_info_window = PEInfoWindow(canonicalizeModuleName(cdll_path), pefile);
+        this->m_is_valid = true;
+    } catch (exception& err) {
+        this->m_is_valid = false;
+    }
+}
+
 GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node) {
     if (!node.IsSequence() && node.IsDefined())
         throw std::runtime_error("GuiSplugDllInjector: node is not a sequence");
@@ -30,7 +66,6 @@ GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node) {
             throw std::runtime_error("GuiSplugDllInjector: item is not a map");
 
         DLLInjectState state;
-        state.is_internal = false;
         state.enable = !item["disable"].as<bool>(false);
         state.stealthy = item["stealthy"].as<bool>(false);
         string dll_path = item["path"].as<string>();
@@ -41,35 +76,12 @@ GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node) {
             found_antianti = true;
         }
 
-        try {
-            shared_ptr<MemoryMapPEFile> pefile;
-            if (dll_path == ANTIANTI_DLL) {
-                vector<char> data(hook_library_data, hook_library_data + hook_library_data_size);
-                pefile = make_shared<MemoryMapPEFile>(data);
-            } else {
-                pefile = make_shared<MemoryMapPEFile>(dll_path);
-            }
-
-            auto _exports = pefile->exports();
-            vector<string> export_names;
-            for (auto& e: _exports)
-                export_names.push_back(e.second.first);
-
-            state.m_info_window = PEInfoWindow(export_names, canonicalizeModuleName(dll_path), pefile->header());
-            state.m_is_valid = true;
-        } catch (exception&) {
-            state.m_is_valid = false;
-        }
-
         if (dll_path.empty())
             throw std::runtime_error("GuiSplugDllInjector: dll_path is empty");
         
-        state.dll_path = shared_ptr<char>(new char[MAX_ADDR_LEN], std::default_delete<char[]>());
-        state.exchange = shared_ptr<char>(new char[MAX_ADDR_LEN], std::default_delete<char[]>());
-
         strncpy(state.dll_path.get(), dll_path.c_str(), MAX_ADDR_LEN);
         strncpy(state.exchange.get(), exchange.c_str(), MAX_ADDR_LEN);
-        state.deleted = false;
+        state.refresh();
 
         this->m_dlls.push_back(state);
     }
@@ -77,29 +89,9 @@ GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node) {
     if (!found_antianti) {
         DLLInjectState state;
         state.is_internal = true;
-        state.enable = true;
-        state.stealthy = false;
-        state.dll_path = shared_ptr<char>(new char[MAX_ADDR_LEN], std::default_delete<char[]>());
-        state.exchange = shared_ptr<char>(new char[MAX_ADDR_LEN], std::default_delete<char[]>());
+        strcpy(state.dll_path.get(), ANTIANTI_DLL);
 
-        try {
-            vector<char> data(hook_library_data, hook_library_data + hook_library_data_size);
-            auto pefile = make_shared<MemoryMapPEFile>(data);
-            auto _exports = pefile->exports();
-            vector<string> export_names;
-            for (auto& e: _exports)
-                export_names.push_back(e.second.first);
-
-            state.m_info_window = PEInfoWindow(export_names, ANTIANTI_DLL, pefile->header());
-            state.m_is_valid = true;
-        } catch (exception&) {
-            state.m_is_valid = false;
-        }
-
-        strncpy(state.dll_path.get(), ANTIANTI_DLL, MAX_ADDR_LEN);
-        strncpy(state.exchange.get(), ANTIANTI_DLL_EXCHANGE_SYMBOL, MAX_ADDR_LEN);
-        state.deleted = false;
-
+        state.refresh();
         this->m_dlls.insert(this->m_dlls.begin(), state);
     }
 }
@@ -195,6 +187,8 @@ bool GuiSplugDllInjector::show() {
         }
         if (!is_internal && ImGui::Button("删除"))
             ImGui::OpenPopup("Delete?");
+        
+        state.refresh();
 
         ImGui::PopID();
         ImGui::Spacing();
@@ -211,40 +205,6 @@ bool GuiSplugDllInjector::show() {
     ImGui::SameLine();
     if (ImGui::Button("新增", add_size)) {
         DLLInjectState state;
-        state.enable = true;
-        state.stealthy = false;
-        state.dll_path = shared_ptr<char>(new char[MAX_ADDR_LEN], std::default_delete<char[]>());
-        state.exchange = shared_ptr<char>(new char[MAX_ADDR_LEN], std::default_delete<char[]>());
-        strncpy(state.dll_path.get(), "", MAX_ADDR_LEN);
-        strncpy(state.exchange.get(), "", MAX_ADDR_LEN);
-        state.deleted = false;
-
-        for (auto& p: this->m_dlls) {
-            auto n = canonicalizeModuleName(p.dll_path.get());
-
-            if (n == canonicalizeModuleName(state.dll_path.get())) {
-                if (ImGui::BeginPopupModal("Same DLL Error")) {
-                    ImGui::Text("已存在相同的DLL");
-                    ImGui::EndPopup();
-                }
-                ImGui::OpenPopup("Same DLL Error");
-                return true;
-            }
-        }
-
-        try {
-            auto pefile = make_shared<MemoryMapPEFile>(state.dll_path.get());
-            auto _exports = pefile->exports();
-            vector<string> export_names;
-            for (auto& e: _exports)
-                export_names.push_back(e.second.first);
-
-            state.m_info_window = PEInfoWindow(export_names, canonicalizeModuleName(state.dll_path.get()), pefile->header());
-            state.m_is_valid = true;
-        } catch (exception&) {
-            state.m_is_valid = false;
-        }
-
         this->m_dlls.push_back(state);
     }
 

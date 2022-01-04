@@ -9,11 +9,15 @@ PEInfoWindow::PEInfoWindow()
     this->visibility() = false;
 }
 
-PEInfoWindow::PEInfoWindow(vector<string> exports, string modulename, PEHeader header): 
-    m_exports(std::move(exports)), m_header(header)
+PEInfoWindow::PEInfoWindow(std::string modname, shared_ptr<MemoryMapPEFile> pefile):
+    m_modulename(modname), m_pefile(pefile)
 {
-    this->m_modulename = canonicalizeModuleName(modulename);
     this->m_title = "PE Info - " + this->m_modulename;
+
+    auto& _exports = pefile->exports();
+    for (auto& e: _exports)
+        this->m_exports.push_back(e.second.first);
+
     this->visibility() = false;
 }
 

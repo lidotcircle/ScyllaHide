@@ -8,6 +8,10 @@
 #include <tuple>
 
 struct DLLInjectState {
+private:
+    std::string m_old_dll_path;
+
+public:
     bool enable;
     bool stealthy;
     bool deleted;
@@ -16,6 +20,9 @@ struct DLLInjectState {
     PEInfoWindow m_info_window;
     std::shared_ptr<char> dll_path;
     std::shared_ptr<char> exchange;
+
+    DLLInjectState();
+    void refresh();
 };
 
 class GuiSplugDllInjector : public GuiYamlNode

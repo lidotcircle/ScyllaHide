@@ -13,6 +13,7 @@ target_link_libraries(MonitorLibrary ntdll)
 target_link_libraries(MonitorLibrary sexchange_MT)
 target_link_libraries(MonitorLibrary slogger_MT)
 target_link_libraries(MonitorLibrary sutils_MT)
+target_link_libraries(MonitorLibrary smalloc_MT)
 target_link_libraries(MonitorLibrary nljson)
 
 # staticlly link to msvcrt

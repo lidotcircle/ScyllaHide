@@ -115,6 +115,7 @@ YAML::Node GuiSplugInlineHook::getNode() {
         n["disable"] = !pair.second.m_enable;
 
         for (auto& state : pair.second.m_hooks) {
+            state.revalidate();
             string org(state.m_original.get());
             if (!state.m_valid)
                 continue;
@@ -131,6 +132,7 @@ YAML::Node GuiSplugInlineHook::getNode() {
     }
 
     for (auto& state : this->m_hooks) {
+        state.revalidate();
         string org(state.m_original.get());
         if (!state.m_valid)
             continue;

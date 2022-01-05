@@ -2,6 +2,9 @@
 #include "exchange_data.h"
 #include "log_client.h"
 #include "DllMain.h"
+#include "nlohmann/json.hpp"
+#include "hex.h"
+#include <stdexcept>
 
 
 DLLExport_C NTSTATUS NTAPI HookedNtWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG BufferSize, PULONG NumberofBytesWritten)
@@ -11,6 +14,25 @@ DLLExport_C NTSTATUS NTAPI HookedNtWriteVirtualMemory(HANDLE ProcessHandle, PVOI
                 "                     Buffer = ..., BufferSize = 0x%04x, PNumberOfBytesWritten = 0x%08x)",
                 ProcessHandle, BaseAddress,
                 BufferSize, NumberofBytesWritten);
+    {
+        client.info("find print_buffer");
+        auto bx = exchange_data.lookup_key("print_buffer");
+        if (bx && BufferSize > 0) {
+            client.info("print_buffer found, %s", bx);
+
+            try {
+                auto js = nlohmann::json::parse(bx);
+                auto write = js.get<bool>();
+
+                if (write) {
+                    auto hexstr = hex_encode(Buffer, BufferSize);
+                    client.info("buf  = %s", hexstr.c_str());
+                }
+            } catch (std::exception& e) {
+                client.error("exception: %s", e.what());
+            }
+        }
+    }
 
     auto dNtWriteVirtualMemory = exchange_data.lookup_trampoline<decltype(&NtWriteVirtualMemory)>(&NtWriteVirtualMemory);
     return dNtWriteVirtualMemory(ProcessHandle, BaseAddress, Buffer, BufferSize, NumberofBytesWritten);

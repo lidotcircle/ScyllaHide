@@ -109,8 +109,7 @@ int ScyllaGuiApp::render_frame()
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | 
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | 
-                 ImGuiWindowFlags_NoScrollWithMouse |
-                 ImGuiWindowFlags_NoBringToFrontOnFocus))
+                 ImGuiWindowFlags_NoScrollWithMouse))
     {
         if (ImGui::BeginChild("FileMenu", ImVec2(0, 20), false, ImGuiWindowFlags_NoScrollbar))
         {

@@ -89,7 +89,8 @@ GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node) {
     if (!found_antianti) {
         DLLInjectState state;
         state.is_internal = true;
-        strcpy(state.dll_path.get(), ANTIANTI_DLL);
+        strncpy(state.dll_path.get(), ANTIANTI_DLL, MAX_ADDR_LEN);
+        strncpy(state.exchange.get(), ANTIANTI_DLL_EXCHANGE_SYMBOL, MAX_ADDR_LEN);
 
         state.refresh();
         this->m_dlls.insert(this->m_dlls.begin(), state);

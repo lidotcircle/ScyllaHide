@@ -51,7 +51,7 @@ static addr_t parseAddr(const string& str) {
  *  note: address is a hexdecimal number which must start with 0x
  */
 void SPlugInlineHook::doit(const YAML::Node& node) {
-    if (!node.IsMap() && node.IsDefined())
+    if (!node.IsMap() && node.IsDefined() && !node.IsNull())
         throw runtime_error("inline hook rule should be a map");
 
     if (node["disable"].as<bool>(false))

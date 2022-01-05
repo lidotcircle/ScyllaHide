@@ -7,7 +7,7 @@ using namespace std;
 
 
 GuiSplugKeyValue::GuiSplugKeyValue(const YAML::Node& node) {
-    if (!node.IsMap() && node.IsDefined()) {
+    if (!node.IsMap() && node.IsDefined() && !node.IsNull()) {
         throw std::runtime_error("GuiSplugKeyValue(): Node is not a map");
     }
 

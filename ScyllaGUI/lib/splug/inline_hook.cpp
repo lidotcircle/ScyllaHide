@@ -54,7 +54,7 @@ void HookPairState::revalidate() {
 
 
 GuiSplugInlineHook::GuiSplugInlineHook(const YAML::Node& node) {
-    if (!node.IsMap() && node.IsDefined())
+    if (!node.IsMap() && node.IsDefined() && !node.IsNull())
         throw runtime_error("GuiSplugInlineHook: node is not a map");
 
     this->m_enable = !node["disable"].as<bool>(false);

@@ -11,7 +11,7 @@ SPlugKeyValue::SPlugKeyValue(ScyllaContextPtr context) : SPlug(context) {}
 SPlugKeyValue::~SPlugKeyValue() {}
 
 void SPlugKeyValue::doit(const YAML::Node& node) {
-    if (!node.IsMap())
+    if (!node.IsMap() && node.IsDefined() && !node.IsNull())
         throw std::runtime_error("SPlugKeyValue::doit: node is not a map");
     
     auto ctx = this->context();

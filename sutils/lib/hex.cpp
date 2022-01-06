@@ -6,7 +6,7 @@
 
 static const char HexMapping[] = "0123456789ABCDEF";
 
-std::string hex_encode(const void* _src, size_t src_len)
+std::string hex_encode(const void* _src, size_t src_len, const std::string& delim, size_t len_per_line)
 {
     const char* src = static_cast<const char*>(_src);
     std::string ans;
@@ -17,6 +17,10 @@ std::string hex_encode(const void* _src, size_t src_len)
         unsigned char n2 = c & 0x0F;
         ans.push_back(HexMapping[n1]);
         ans.push_back(HexMapping[n2]);
+        ans += delim;
+
+        if (len_per_line > 0 && (i+1) % len_per_line == 0)
+            ans += "\n";
     }
 
     return ans;
@@ -30,12 +34,25 @@ static const std::map<char,char> HexReverseMapping = {
 };
 std::vector<char> hex_decode(const std::string& hexstr)
 {
-    assert(hexstr.size() % 2 == 0);
     std::vector<char> ans;
+    size_t index = 0;
+    auto pull_char = [&](char& c) {
+        if (index >= ans.size())
+            return false;
 
-    for(int i=0;i<hexstr.size();i+=2) {
-        char c1 = hexstr[i];
-        char c2 = hexstr[i+1];
+        do {
+            c = ans[index++];
+
+            if (index >= ans.size())
+                return false;
+        } while (c == '\n' || c == '\r' || c == ' ');
+
+        return true;
+    };
+
+    char c1, c2;
+    while(pull_char(c1) && pull_char(c2))
+    {
         if (HexReverseMapping.find(c1) == HexReverseMapping.end()
          || HexReverseMapping.find(c2) == HexReverseMapping.end())
         {

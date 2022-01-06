@@ -25,11 +25,11 @@ DLLExport_C NTSTATUS NTAPI HookedNtWriteVirtualMemory(HANDLE ProcessHandle, PVOI
                 auto write = js.get<bool>();
 
                 if (write) {
-                    auto hexstr = hex_encode(Buffer, BufferSize);
-                    client.info("buf  = %s", hexstr.c_str());
+                    auto hexstr = hex_encode(Buffer, BufferSize, " ", 16);
+                    client.info("buf  = \n%s", hexstr.c_str());
                 }
-            } catch (std::exception& e) {
-                client.error("exception: %s", e.what());
+            } catch (nlohmann::json::exception& e ) {
+                client.error("exception");
             }
         }
     }

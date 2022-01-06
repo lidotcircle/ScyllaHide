@@ -7,10 +7,33 @@
 #include <tchar.h>
 #include <string>
 #include <vector>
+#include <map>
 #include <stdexcept>
 using namespace std;
 #pragma comment(lib, "d3d9.lib")
 
+static map<HWND,ImGuiAPP*> hwnd2apps;
+static void add_imguiapp(HWND hwnd, ImGuiAPP* app)
+{
+    if (hwnd2apps.find(hwnd) != hwnd2apps.end())
+        throw runtime_error("hwnd2apps already contains hwnd");
+
+    hwnd2apps[hwnd] = app;
+}
+static void remove_imguiapp(HWND hwnd)
+{
+    if (hwnd2apps.find(hwnd) == hwnd2apps.end())
+        throw runtime_error("hwnd2apps does not contain hwnd");
+
+    hwnd2apps.erase(hwnd);
+}
+static ImGuiAPP* get_imguiapp(HWND hwnd)
+{
+    if (hwnd2apps.find(hwnd) == hwnd2apps.end())
+        return nullptr;
+
+    return hwnd2apps[hwnd];
+}
 
 static bool FileExists(LPCTSTR szPath)
 {
@@ -66,7 +89,8 @@ static void ResetDevice()
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 // Win32 message handler
-static LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+/* static */
+LRESULT WINAPI ImGuiAPP::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
         return true;
@@ -85,6 +109,17 @@ static LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
         if ((wParam & 0xfff0) == SC_KEYMENU) // Disable ALT application menu
             return 0;
         break;
+    
+    case WM_SHOWWINDOW: {
+        auto app = get_imguiapp(hWnd);
+        if (app) {
+            if (wParam == TRUE) {
+                app->window_show();
+            } else {
+                app->window_hide();
+            }
+        }
+    } break;
     case WM_DESTROY:
         ::PostQuitMessage(0);
         return 0;
@@ -95,56 +130,12 @@ static LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 void ImGuiAPP::run_loop() {
     this->m_run = true;
-
-    // Create application window
-    // ImGui_ImplWin32_EnableDpiAwareness();
-    WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, "ImGui APP", NULL };
-    ::RegisterClassEx(&wc);
-    HWND hwnd = ::CreateWindow(
-        wc.lpszClassName, this->m_title.c_str(), WS_OVERLAPPEDWINDOW,
-        100, 100, this->m_default_width, this->m_default_height,
-        NULL, NULL, wc.hInstance, NULL);
-
-    // Initialize Direct3D
-    if (!CreateDeviceD3D(hwnd))
-    {
-        CleanupDeviceD3D();
-        ::UnregisterClass(wc.lpszClassName, wc.hInstance);
-        throw runtime_error("Failed to create Direct3D device");
-    }
+    auto& hwnd = this->m_hwnd;
+    ImGuiIO& io = ImGui::GetIO();
 
     // Show the window
     ::ShowWindow(hwnd, SW_SHOWDEFAULT);
     ::UpdateWindow(hwnd);
-
-    // Setup Dear ImGui context
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-    // io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
-
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    //ImGui::StyleColorsClassic();
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplWin32_Init(hwnd);
-    ImGui_ImplDX9_Init(g_pd3dDevice);
-
-    vector<string> font_list = {
-        "c:\\Windows\\Fonts\\msyh.ttc",
-        "c:\\Windows\\Fonts\\msyh.ttf",
-    };
-
-    for (auto& font: font_list) {
-        if (FileExists(font.c_str())) {
-            io.Fonts->AddFontFromFileTTF(font.c_str(), 16.0f, NULL, io.Fonts->GetGlyphRangesChineseFull());
-            break;
-        }
-    }
 
     while (this->m_run)
     {
@@ -169,7 +160,7 @@ void ImGuiAPP::run_loop() {
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
-        if (this->render_frame() != 0) {
+        if (this->m_shown && this->render_frame() != 0) {
             this->m_run = false;
             break;
         }
@@ -201,14 +192,6 @@ void ImGuiAPP::run_loop() {
         if (result == D3DERR_DEVICELOST && g_pd3dDevice->TestCooperativeLevel() == D3DERR_DEVICENOTRESET)
             ResetDevice();
     }
-    
-    ImGui_ImplDX9_Shutdown();
-    ImGui_ImplWin32_Shutdown();
-    ImGui::DestroyContext();
-
-    CleanupDeviceD3D();
-    ::DestroyWindow(hwnd);
-    ::UnregisterClass(wc.lpszClassName, wc.hInstance);
 }
 
 void ImGuiAPP::stop() {
@@ -216,4 +199,78 @@ void ImGuiAPP::stop() {
 }
 
 ImGuiAPP::ImGuiAPP(string title, float default_width, float default_height):
-    m_title(title), m_default_width(default_width), m_default_height(default_height) {}
+    m_title(title), m_default_width(default_width), m_default_height(default_height), m_shown(false)
+{
+    // Create application window
+    // ImGui_ImplWin32_EnableDpiAwareness();
+    this->m_hwnd = NULL;
+    auto& wc = this->m_wcls;
+    auto& hwnd = this->m_hwnd;
+    wc = { sizeof(WNDCLASSEX), CS_CLASSDC, ImGuiAPP::WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, "ImGui APP", NULL };
+    ::RegisterClassEx(&wc);
+    hwnd = ::CreateWindow(
+        wc.lpszClassName, this->m_title.c_str(), WS_OVERLAPPEDWINDOW,
+        100, 100, this->m_default_width, this->m_default_height,
+        NULL, NULL, wc.hInstance, NULL);
+    add_imguiapp(hwnd, this);
+
+    // Initialize Direct3D
+    if (!CreateDeviceD3D(hwnd))
+    {
+        CleanupDeviceD3D();
+        ::UnregisterClass(wc.lpszClassName, wc.hInstance);
+        throw runtime_error("Failed to create Direct3D device");
+    }
+
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    // io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
+
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+    //ImGui::StyleColorsClassic();
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplWin32_Init(hwnd);
+    ImGui_ImplDX9_Init(g_pd3dDevice);
+
+    vector<string> font_list = {
+        "c:\\Windows\\Fonts\\msyh.ttc",
+        "c:\\Windows\\Fonts\\msyh.ttf",
+    };
+
+    for (auto& font: font_list) {
+        if (FileExists(font.c_str())) {
+            io.Fonts->AddFontFromFileTTF(font.c_str(), 16.0f, NULL, io.Fonts->GetGlyphRangesChineseFull());
+            break;
+        }
+    }
+}
+
+ImGuiAPP::~ImGuiAPP()
+{
+    ImGui_ImplDX9_Shutdown();
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
+
+    CleanupDeviceD3D();
+    if (this->m_hwnd != NULL) {
+        ::DestroyWindow(this->m_hwnd);
+        remove_imguiapp(this->m_hwnd);
+        this->m_hwnd = NULL;
+    }
+    ::UnregisterClass(this->m_wcls.lpszClassName, this->m_wcls.hInstance);
+}
+
+void ImGuiAPP::window_show() {
+    this->m_shown = true;
+}
+
+void ImGuiAPP::window_hide() {
+    this->m_shown = false;
+}

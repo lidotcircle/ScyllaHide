@@ -54,7 +54,9 @@ void DLLInjectState::refresh()
     }
 }
 
-GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node) {
+GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node, bool dbgplugin_mode):
+    m_dbgplugin_mode(dbgplugin_mode) 
+{
     if (!node.IsSequence() && node.IsDefined())
         throw std::runtime_error("GuiSplugDllInjector: node is not a sequence");
     
@@ -123,6 +125,7 @@ YAML::Node GuiSplugDllInjector::getNode() {
     return node;
 }
 
+static bool val_true = true;
 bool GuiSplugDllInjector::show() {
     if (!this->visibility())
         return false;
@@ -148,8 +151,17 @@ bool GuiSplugDllInjector::show() {
         ImGui::Checkbox("启用", &state.enable);
         ImGui::SameLine();
         ImGui::Dummy(dummy);
+
+        bool* p_stealthy = &state.stealthy;
+        if (this->m_dbgplugin_mode) {
+            ImGui::BeginDisabled();
+            p_stealthy = &val_true;
+        }
         ImGui::SameLine();
-        ImGui::Checkbox("内存注入", &state.stealthy);
+        ImGui::Checkbox("内存注入", p_stealthy);
+        if (this->m_dbgplugin_mode)
+            ImGui::EndDisabled();
+
         if (state.m_is_valid) {
             ImGui::SameLine();
             ImGui::Checkbox("模块信息窗口", &state.m_info_window.visibility());

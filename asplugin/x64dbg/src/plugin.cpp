@@ -1,11 +1,13 @@
 #include "plugin.h"
 #include "scyllagui/scylla_app.h"
+#include "scylla/utils.h"
 #include <stdexcept>
 #include <memory>
 #include <mutex>
 using namespace std;
 
 
+static string default_config_path = "";
 static unique_ptr<ScyllaGuiApp> app;
 static std::thread app_ui_thread;
 static std::condition_variable app_start_cond;
@@ -30,10 +32,14 @@ static void ensure_scylla_app()
         app_ui_thread.join();
 
     app_ui_thread = std::thread([config_file]() {
-        app = make_unique<ScyllaGuiApp>();
+        app = make_unique<ScyllaGuiApp>(true);
 
-        if (!config_file.empty())
+        if (config_file.empty() && app->config_file().empty()) {
+            if (!default_config_path.empty())
+                app->open_file(default_config_path);
+        } else if (!config_file.empty()) {
             app->open_file(config_file);
+        }
 
         while (!app->closed()) {
             if (!app_running) {
@@ -80,6 +86,7 @@ static void scylla_app_close() {
     app_running = false;
 }
 
+
 enum ScyllaMenuItems : int {
     MENU_SHOW = 0,
     MENU_CLOSE,
@@ -103,15 +110,54 @@ static void cbMenuEntry(CBTYPE cbType, void* callbackInfo) {
     }
 }
 
+static bool caught_systembp = false;
 static void cbDebugloop(CBTYPE cbType, void* callbackInfo)
 {
     PLUG_CB_DEBUGEVENT* d = (PLUG_CB_DEBUGEVENT*)callbackInfo;
-    d->DebugEvent->dwProcessId;
+    auto& de = *d->DebugEvent;
+
+    if (de.dwDebugEventCode == CREATE_PROCESS_DEBUG_EVENT) {
+        caught_systembp = false;
+        ensure_scylla_app();
+        app->set_pid(de.dwProcessId);
+    }
+    else if (!caught_systembp && de.dwDebugEventCode == EXCEPTION_DEBUG_EVENT) {
+        if (de.u.Exception.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT) {
+            caught_systembp = true;
+            app->operation_doit();
+        }
+    }
+}
+
+static void cbDetach(CBTYPE cbType, void* callbackInfo)
+{
+    ensure_scylla_app();
+    app->set_pid(0);
+}
+
+static void cbStopDbg(CBTYPE cbType, void* callbackInfo)
+{
+    ensure_scylla_app();
+    app->set_pid(0);
+}
+
+static bool FileExists(LPCTSTR szPath)
+{
+  DWORD dwAttrib = GetFileAttributes(szPath);
+
+  return (dwAttrib != INVALID_FILE_ATTRIBUTES && 
+         !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
 
 //Initialize your plugin data here.
 bool pluginInit(PLUG_INITSTRUCT* initStruct)
 {
+    default_config_path = initStruct->pluginName;
+    default_config_path.erase(default_config_path.find_last_of('\\') + 1);
+    default_config_path += "scylla.yaml";
+    if (!FileExists(default_config_path.c_str()))
+        default_config_path = "";
+
     try {
         dprintf("Initializing\n");
         ensure_scylla_app();
@@ -122,6 +168,8 @@ bool pluginInit(PLUG_INITSTRUCT* initStruct)
 
     _plugin_registercallback(pluginHandle, CB_MENUENTRY, cbMenuEntry);
     _plugin_registercallback(pluginHandle, CB_DEBUGEVENT, cbDebugloop);
+    _plugin_registercallback(pluginHandle, CB_DETACH, cbDetach);
+    _plugin_registercallback(pluginHandle, CB_STOPDEBUG, cbStopDbg);
 
     return true; //Return false to cancel loading the plugin.
 }

@@ -8,7 +8,7 @@
 class GuiSplugView: public GuiYamlMap
 {
 public:
-    GuiSplugView(const YAML::Node& node);
+    GuiSplugView(const YAML::Node& node, bool dbgplugin_mode);
 };
 
 #endif // _SCYLLA_GUI_SPLUG_VIEW_H_

@@ -9,12 +9,16 @@ using namespace std;
 #define MAX_CMDLINE_ARGS_LEN 1024
 
 
-ScyllaGuiApp::ScyllaGuiApp():
+ScyllaGuiApp::ScyllaGuiApp(bool dbgplugin_mode):
     ImGuiAPP("Scylla Monitor", 500, 700),
     m_remote_log_window("Remote Log Window"),
-    m_local_log_window("Local Log Window"), m_local_logger(nullptr)
+    m_local_log_window("Local Log Window"), m_local_logger(nullptr),
+    m_dbgplugin_mode(dbgplugin_mode)
 {
     this->m_mode = RunningMode_CMDLine;
+    if (dbgplugin_mode)
+        this->m_mode = RunningMode_PID;
+
     m_executable = shared_ptr<char>(new char[MAX_PATH], std::default_delete<char[]>());
     m_executable.get()[0] = '\0';
     m_cmdline = shared_ptr<char>(new char[MAX_CMDLINE_ARGS_LEN], std::default_delete<char[]>());
@@ -40,7 +44,7 @@ ScyllaGuiApp::ScyllaGuiApp():
 
     try {
         YAML::Node empty;
-        this->m_splug_view = make_unique<GuiSplugView>(empty);
+        this->m_splug_view = make_unique<GuiSplugView>(empty, m_dbgplugin_mode);
     } catch (exception& e) {
         this->error(e.what());
     }
@@ -60,7 +64,7 @@ void ScyllaGuiApp::open_file(const string& filename)
             throw runtime_error("GetFullPathNameA failed");
 
         auto node = YAML::LoadFile(fullfilename);
-        this->m_splug_view = make_unique<GuiSplugView>(node);
+        this->m_splug_view = make_unique<GuiSplugView>(node, m_dbgplugin_mode);
         this->m_config_file = fullfilename;
         this->info("加载配置文件: %s", fullfilename);
     } catch (exception& e) {
@@ -91,6 +95,11 @@ void ScyllaGuiApp::save_file()
 
 const std::string& ScyllaGuiApp::config_file() {
     return this->m_config_file;
+}
+
+
+void ScyllaGuiApp::add_collapsing_config(std::string key, std::string title, std::unique_ptr<GuiYamlNode> child) {
+    this->m_splug_view->add_child(key, title, move(child));
 }
 
 std::string ScyllaGuiApp::dump()
@@ -127,8 +136,12 @@ int ScyllaGuiApp::render_frame()
         ImGui::Spacing();
 
         auto h = ImGui::GetWindowHeight();
-        if (h > (240 + 30)) {
-            h -= (240 + 30);
+        auto control_height = 240 + 30;
+        if (this->m_dbgplugin_mode)
+            control_height = 135;
+
+        if (h > control_height + 30) {
+            h -= control_height;
         } else {
             h = 30;
         }
@@ -211,31 +224,33 @@ void ScyllaGuiApp::widget_log_line()
 
 void ScyllaGuiApp::child_window_control()
 {
-    this->widget_operation_mode();
+    if (!this->m_dbgplugin_mode) {
+        this->widget_operation_mode();
 
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
 
-    switch (m_mode)
-    {
-    case RunningMode_CMDLine:
-        this->widget_new_process();
-        break;
-    case RunningMode_ProcessName:
-        this->widget_process_name();
-        break;
-    case RunningMode_PID:
-        this->widget_process_id();
-        break;
+        switch (m_mode)
+        {
+        case RunningMode_CMDLine:
+            this->widget_new_process();
+            break;
+        case RunningMode_ProcessName:
+            this->widget_process_name();
+            break;
+        case RunningMode_PID:
+            this->widget_process_id();
+            break;
+        }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        this->widget_suspend_mod();
+        ImGui::Spacing();
     }
-
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    this->widget_suspend_mod();
-    ImGui::Spacing();
 
     if (ImGui::Button("运行")) {
         this->m_injected = this->operation_doit();
@@ -408,6 +423,12 @@ void ScyllaGuiApp::widget_suspend_mod()
         ImGui::Text("某些暂停模式可能导致远程线程注入DLL出现死锁");
         ImGui::EndTooltip();
     }
+}
+
+void ScyllaGuiApp::set_pid(int pid)
+{
+    this->m_pid = pid;
+    this->m_mode = RunningMode_PID;
 }
 
 bool ScyllaGuiApp::operation_doit()

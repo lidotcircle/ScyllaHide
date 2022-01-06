@@ -29,9 +29,10 @@ class GuiSplugDllInjector : public GuiYamlNode
 {
 private:
     std::vector<DLLInjectState> m_dlls;
+    const bool m_dbgplugin_mode;
 
 public:
-    GuiSplugDllInjector(const YAML::Node& node);
+    GuiSplugDllInjector(const YAML::Node& node, bool dbgplugin_mode);
 
     virtual YAML::Node getNode() override;
 

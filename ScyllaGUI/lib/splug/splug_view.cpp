@@ -9,7 +9,7 @@
 using namespace std;
 
 
-GuiSplugView::GuiSplugView(const YAML::Node& node)
+GuiSplugView::GuiSplugView(const YAML::Node& node, bool dbgplugin_mode)
 {
     YAML::Node _node;
 
@@ -24,7 +24,7 @@ GuiSplugView::GuiSplugView(const YAML::Node& node)
         throw runtime_error("GuiSplugView: node is not a map");
 
     this->add_child("pebPatch", "PEB", make_unique<GuiSplugPebPatch>(_node["pebPatch"]));
-    this->add_child("dllInjector", "DLL注入", make_unique<GuiSplugDllInjector>(_node["dllInjector"]));
+    this->add_child("dllInjector", "DLL注入", make_unique<GuiSplugDllInjector>(_node["dllInjector"], dbgplugin_mode));
     this->add_child("inlineHook", "Inline Hook", make_unique<GuiSplugInlineHook>(_node["inlineHook"]));
     this->add_child("keyValue", "键值配置", make_unique<GuiSplugKeyValue>(_node["keyValue"]));
     this->add_child("exchange", "Exchange", make_unique<GuiSplugExchange>(_node["exchange"]));

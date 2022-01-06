@@ -56,6 +56,8 @@ private:
     std::chrono::system_clock::time_point m_log_prev_timestamp;
     enum { Log_None, Log_Info, Log_Warning, Log_Error, } m_log_level;
 
+    const bool m_dbgplugin_mode;
+
 
 /**----------------------------------
  * ------- Renderer Functions ------- */
@@ -70,9 +72,6 @@ private:
 /** ------- End Renderer Functions -------
  *  -------------------------------------- */
 
-    bool operation_doit();
-    void operation_undo();
-
 
 protected:
     virtual int render_frame() override;
@@ -83,13 +82,18 @@ protected:
 
 
 public:
-    ScyllaGuiApp();
+    ScyllaGuiApp(bool dbgplugin_mode = false);
 
     void open_file(const std::string& filename);
     void save_file();
     void save_file(const std::string& filename);
     const std::string& config_file();
 
+    void set_pid(int pid);
+    bool operation_doit();
+    void operation_undo();
+
+    void add_collapsing_config(std::string key, std::string title, std::unique_ptr<GuiYamlNode> child);
     std::string dump();
 };
 

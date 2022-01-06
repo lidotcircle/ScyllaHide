@@ -13,6 +13,7 @@ private:
     float m_default_width;
     float m_default_height;
     bool  m_shown;
+    bool  m_closed;
     WNDCLASSEX m_wcls;
     HWND m_hwnd;
 
@@ -27,6 +28,13 @@ public:
 
     void run_loop();
     void stop();
+
+    void disable_resize();
+    void close_window();
+
+    bool running() const;
+    bool shown() const;
+    bool closed() const;
 
     virtual ~ImGuiAPP();
 };

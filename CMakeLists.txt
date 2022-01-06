@@ -26,5 +26,6 @@ add_subdirectory("InjectorCLI")
 
 add_subdirectory("ScyllaGUI")
 add_subdirectory("ScyllaStandalone")
+add_subdirectory("asplugin")
 
 add_subdirectory("ScyllaTest")

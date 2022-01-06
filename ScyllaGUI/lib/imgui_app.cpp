@@ -120,15 +120,25 @@ LRESULT WINAPI ImGuiAPP::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
             }
         }
     } break;
-    case WM_DESTROY:
-        ::PostQuitMessage(0);
-        return 0;
+    case WM_DESTROY: {
+        auto app = get_imguiapp(hWnd);
+        if (!app) {
+            ::PostQuitMessage(0);
+            return 0;
+        } else {
+            app->m_closed = true;
+            app->m_run = false;
+        }
+    } break;
     }
     return ::DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
 
 void ImGuiAPP::run_loop() {
+    if (this->m_closed)
+        throw runtime_error("ImGuiAPP::run_loop() called in closed state");
+
     this->m_run = true;
     auto& hwnd = this->m_hwnd;
     ImGuiIO& io = ImGui::GetIO();
@@ -149,8 +159,6 @@ void ImGuiAPP::run_loop() {
         {
             ::TranslateMessage(&msg);
             ::DispatchMessage(&msg);
-            if (msg.message == WM_QUIT)
-                this->m_run = false;
         }
         if (!this->m_run)
             break;
@@ -199,7 +207,8 @@ void ImGuiAPP::stop() {
 }
 
 ImGuiAPP::ImGuiAPP(string title, float default_width, float default_height):
-    m_title(title), m_default_width(default_width), m_default_height(default_height), m_shown(false)
+    m_title(title), m_default_width(default_width), m_default_height(default_height),
+    m_run(false), m_shown(false), m_closed(true)
 {
     // Create application window
     // ImGui_ImplWin32_EnableDpiAwareness();
@@ -213,6 +222,7 @@ ImGuiAPP::ImGuiAPP(string title, float default_width, float default_height):
         100, 100, this->m_default_width, this->m_default_height,
         NULL, NULL, wc.hInstance, NULL);
     add_imguiapp(hwnd, this);
+    this->m_closed = false;
 
     // Initialize Direct3D
     if (!CreateDeviceD3D(hwnd))
@@ -266,6 +276,22 @@ ImGuiAPP::~ImGuiAPP()
     }
     ::UnregisterClass(this->m_wcls.lpszClassName, this->m_wcls.hInstance);
 }
+
+void ImGuiAPP::disable_resize() {
+    if (this->closed())
+        return;
+    
+    auto style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+    SetWindowLong(this->m_hwnd, GWL_STYLE, style);
+}
+
+void ImGuiAPP::close_window() {
+    PostMessageA(this->m_hwnd, WM_CLOSE, 0, 0);
+}
+
+bool ImGuiAPP::running() const { return this->m_run; }
+bool ImGuiAPP::closed() const { return this->m_closed; }
+bool ImGuiAPP::shown() const { return this->m_shown; }
 
 void ImGuiAPP::window_show() {
     this->m_shown = true;

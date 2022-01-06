@@ -26,6 +26,9 @@ add_subdirectory(nlohmannjson)
 include(${CMAKE_CURRENT_LIST_DIR}/dearIMGUI.cmake)
 
 
+add_subdirectory(x64dbg)
+
+
 add_library(printf STATIC ${CMAKE_CURRENT_LIST_DIR}/printf/printf.c)
 target_include_directories(printf PUBLIC ${CMAKE_CURRENT_LIST_DIR}/printf)
 

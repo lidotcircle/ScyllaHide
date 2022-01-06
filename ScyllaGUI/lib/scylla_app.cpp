@@ -89,6 +89,10 @@ void ScyllaGuiApp::save_file()
     this->save_file(this->m_config_file);
 }
 
+const std::string& ScyllaGuiApp::config_file() {
+    return this->m_config_file;
+}
+
 std::string ScyllaGuiApp::dump()
 {
     stringstream ss;

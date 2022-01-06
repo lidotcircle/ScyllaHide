@@ -88,6 +88,7 @@ public:
     void open_file(const std::string& filename);
     void save_file();
     void save_file(const std::string& filename);
+    const std::string& config_file();
 
     std::string dump();
 };

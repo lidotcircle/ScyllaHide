@@ -9,7 +9,8 @@
 using namespace std;
 
 
-GuiSplugView::GuiSplugView(const YAML::Node& node, bool dbgplugin_mode)
+GuiSplugView::GuiSplugView(const YAML::Node& node, bool dbgplugin_mode):
+    m_origin_node(node)
 {
     YAML::Node _node;
 
@@ -29,4 +30,9 @@ GuiSplugView::GuiSplugView(const YAML::Node& node, bool dbgplugin_mode)
     this->add_child("keyValue", "键值配置", make_unique<GuiSplugKeyValue>(_node["keyValue"]));
     this->add_child("exchange", "Exchange", make_unique<GuiSplugExchange>(_node["exchange"]));
     this->add_child("logger", "日志服务", make_unique<GuiSplugLogServer>(_node["logger"]));
+}
+
+const YAML::Node& GuiSplugView::get_origin_node() const
+{
+    return m_origin_node;
 }

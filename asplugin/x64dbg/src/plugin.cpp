@@ -1,10 +1,14 @@
 #include "plugin.h"
 #include "scyllagui/scylla_app.h"
+#include "scyllagui/widget/checkbox_list.h"
 #include "scylla/utils.h"
 #include <stdexcept>
 #include <memory>
+#include <tuple>
 #include <mutex>
 using namespace std;
+
+#define x64DBG_CONFIG_ENTRY "x64dbg_plug"
 
 
 static string default_config_path = "";
@@ -34,12 +38,23 @@ static void ensure_scylla_app()
     app_ui_thread = std::thread([config_file]() {
         app = make_unique<ScyllaGuiApp>(true);
 
-        if (config_file.empty() && app->config_file().empty()) {
-            if (!default_config_path.empty())
+        if (config_file.empty()) {
+            if (!default_config_path.empty() && app->config_file().empty())
                 app->open_file(default_config_path);
-        } else if (!config_file.empty()) {
+        } else {
             app->open_file(config_file);
         }
+
+        auto node = app->config_node();
+        if (node.IsNull())
+            node["__"] = "";
+
+        vector<tuple<string,string,bool>> x64dbg_config = {
+            { "enable", "启用", true },
+        };
+        auto x64dbg_config_node = node[x64DBG_CONFIG_ENTRY];
+        auto checkbox_list = make_unique<CheckboxList>(x64dbg_config_node, move(x64dbg_config));
+        app->add_collapsing_config(x64DBG_CONFIG_ENTRY, "x64dbg配置", move(checkbox_list));
 
         while (!app->closed()) {
             if (!app_running) {
@@ -119,12 +134,24 @@ static void cbDebugloop(CBTYPE cbType, void* callbackInfo)
     if (de.dwDebugEventCode == CREATE_PROCESS_DEBUG_EVENT) {
         caught_systembp = false;
         ensure_scylla_app();
+        dprintf("new process pid = %d\n", de.dwProcessId);
         app->set_pid(de.dwProcessId);
     }
     else if (!caught_systembp && de.dwDebugEventCode == EXCEPTION_DEBUG_EVENT) {
         if (de.u.Exception.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT) {
+            dprintf("caught system breakpoint, doit\n");
             caught_systembp = true;
-            app->operation_doit();
+            ensure_scylla_app();
+            auto node = app->dump_node();
+            auto x64dbg_config_node = node[x64DBG_CONFIG_ENTRY];
+            if (!x64dbg_config_node["enable"].as<bool>())
+                return;
+
+            if (app->operation_doit()) {
+                dprintf("doit done\n");
+            } else {
+                dprintf("doit failed\n");
+            }
         }
     }
 }

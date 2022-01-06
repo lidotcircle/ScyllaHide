@@ -93,8 +93,12 @@ void ScyllaGuiApp::save_file()
     this->save_file(this->m_config_file);
 }
 
-const std::string& ScyllaGuiApp::config_file() {
+const std::string& ScyllaGuiApp::config_file() const {
     return this->m_config_file;
+}
+
+const YAML::Node& ScyllaGuiApp::config_node() const {
+    return this->m_splug_view->get_origin_node();
 }
 
 
@@ -102,7 +106,12 @@ void ScyllaGuiApp::add_collapsing_config(std::string key, std::string title, std
     this->m_splug_view->add_child(key, title, move(child));
 }
 
-std::string ScyllaGuiApp::dump()
+YAML::Node ScyllaGuiApp::dump_node() const
+{
+    return this->m_splug_view->getNode();
+}
+
+std::string ScyllaGuiApp::dump() const
 {
     stringstream ss;
     auto node = this->m_splug_view->getNode();

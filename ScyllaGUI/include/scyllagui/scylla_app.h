@@ -87,14 +87,16 @@ public:
     void open_file(const std::string& filename);
     void save_file();
     void save_file(const std::string& filename);
-    const std::string& config_file();
+    const std::string& config_file() const;
+    const YAML::Node& config_node() const;
 
     void set_pid(int pid);
     bool operation_doit();
     void operation_undo();
 
     void add_collapsing_config(std::string key, std::string title, std::unique_ptr<GuiYamlNode> child);
-    std::string dump();
+    YAML::Node dump_node() const;
+    std::string dump() const;
 };
 
 #endif // _SCYLLA_APP_H_

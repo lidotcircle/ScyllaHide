@@ -97,6 +97,11 @@ GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node, bool dbgplugin_
         state.refresh();
         this->m_dlls.insert(this->m_dlls.begin(), state);
     }
+
+    if (m_dbgplugin_mode) {
+        for (auto& state: this->m_dlls)
+            state.stealthy = true;
+    }
 }
 
 YAML::Node GuiSplugDllInjector::getNode() {
@@ -152,13 +157,10 @@ bool GuiSplugDllInjector::show() {
         ImGui::SameLine();
         ImGui::Dummy(dummy);
 
-        bool* p_stealthy = &state.stealthy;
-        if (this->m_dbgplugin_mode) {
+        if (this->m_dbgplugin_mode)
             ImGui::BeginDisabled();
-            p_stealthy = &val_true;
-        }
         ImGui::SameLine();
-        ImGui::Checkbox("内存注入", p_stealthy);
+        ImGui::Checkbox("内存注入", &state.stealthy);
         if (this->m_dbgplugin_mode)
             ImGui::EndDisabled();
 

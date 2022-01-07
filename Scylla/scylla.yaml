@@ -1,30 +1,158 @@
-
-disable: false
-
-logger:
-  disable: false
-  udp_addr: localhost
-  udp_port: 0
-
+pebPatch:
+  BeingDebugged: true
+  NtGlobalFlag: true
+  ProcessParameters: true
+  HeapFlags: true
+  OSBuildNumber: true
 dllInjector:
-  - path: "HookLibrary/HookLibraryx86.dll"
+  - disable: false
     stealthy: false
+    path: monitoring.dll
     exchange: exchange_data
-
+  - disable: false
+    stealthy: false
+    path: antianti.dll
+    exchange: exchange_data
 inlineHook:
   disable: false
+  kernel32.dll:
+    disable: false
+    GetLocalTime:
+      disable: false
+      hook: antianti.dll::_HookedGetLocalTime@.*
+      remark: ""
+    GetSystemTime:
+      disable: false
+      hook: antianti.dll::_HookedGetSystemTime@.*
+      remark: ""
+    GetTickCount64:
+      disable: false
+      hook: antianti.dll::_HookedGetTickCount64@.*
+      remark: ""
+    GetTickCount:
+      disable: false
+      hook: antianti.dll::_HookedGetTickCount@.*
+      remark: ""
+    OutputDebugStringA:
+      disable: false
+      hook: antianti.dll::_HookedOutputDebugStringA@.*
+      remark: ""
   ntdll.dll:
     disable: false
+    NtWriteVirtualMemory:
+      disable: false
+      hook: monitoring.dll::_HookedNtWriteVirtualMemory@.*
+      remark: hijack this request and send to server, then complete the request
+    NtOpenProcess:
+      disable: false
+      hook: monitoring.dll::_HookedNtOpenProcess@.*
+      remark: hijack request -> send -> complete it
     NtReadVirtualMemory:
       disable: false
-      hook: antianti.dll::_HookedNtReadVirtualMemory@.*
+      hook: monitoring.dll::_HookedNtReadVirtualMemory@.*
+      remark: hijack request -> send -> complete it
+    NtClose:
+      disable: false
+      hook: antianti.dll::_HookedNtClose@.*
       remark: ""
-  ntdll.dll::NtWriteVirtualMemory:
+    NtContinue:
+      disable: false
+      hook: antianti.dll::_HookedNtContinue@.*
+      remark: ""
+    NtCreateThread:
+      disable: false
+      hook: antianti.dll::_HookedNtCreateThread@.*
+      remark: ""
+    NtCreateThreadEx:
+      disable: false
+      hook: antianti.dll::_HookedNtCreateThreadEx@.*
+      remark: ""
+    NtDuplicateObject:
+      disable: false
+      hook: antianti.dll::_HookedNtDuplicateObject@.*
+      remark: ""
+    NtGetContextThread:
+      disable: false
+      hook: antianti.dll::_HookedNtGetContextThread@.*
+      remark: ""
+    NtQueryInformationProcess:
+      disable: false
+      hook: antianti.dll::_HookedNtQueryInformationProcess@.*
+      remark: ""
+    NtQueryObject:
+      disable: false
+      hook: antianti.dll::_HookedNtQueryObject@.*
+      remark: ""
+    NtQueryPerformanceCounter:
+      disable: false
+      hook: antianti.dll::_HookedNtQueryPerformanceCounter@.*
+      remark: ""
+    NtQuerySystemInformation:
+      disable: false
+      hook: antianti.dll::_HookedNtQuerySystemInformation@.*
+      remark: ""
+    NtQuerySystemTime:
+      disable: false
+      hook: antianti.dll::_HookedNtQuerySystemTime@.*
+      remark: ""
+    NtResumeThread:
+      disable: false
+      hook: antianti.dll::_HookedNtResumeThread@.*
+      remark: ""
+    NtSetContextThread:
+      disable: false
+      hook: antianti.dll::_HookedNtSetContextThread@.*
+      remark: ""
+    NtSetDebugFilterState:
+      disable: false
+      hook: antianti.dll::_HookedNtSetDebugFilterState@.*
+      remark: ""
+    NtSetInformationProcess:
+      disable: false
+      hook: antianti.dll::_HookedNtSetInformationProcess@.*
+      remark: ""
+    NtSetInformationThread:
+      disable: false
+      hook: antianti.dll::_HookedNtSetInformationThread@.*
+      remark: ""
+    NtYieldExecution:
+      disable: false
+      hook: antianti.dll::_HookedNtYieldExecution@.*
+      remark: ""
+    KiUserExceptionDispatcher:
+      disable: false
+      hook: antianti.dll::_HookedKiUserExceptionDispatcher@.*
+      remark: ""
+  win32u.dll:
     disable: true
-    hook: antianti.dll::_HookedNtWriteVirtualMemory@.*
-    remark: ""
-
+    NtUserBlockInput:
+      disable: false
+      hook: antianti.dll::_HookedNtUserBlockInput@.*
+      remark: ""
+    NtUserBuildHwndList:
+      disable: false
+      hook: antianti.dll::_HookedNtUserBuildHwndList@.*
+      remark: ""
+    NtUserFindWindowEx:
+      disable: false
+      hook: antianti.dll::_HookedNtUserFindWindowEx@.*
+      remark: ""
+    NtUserGetForegroundWindow:
+      disable: false
+      hook: antianti.dll::_HookedNtUserGetForegroundWindow@.*
+      remark: ""
+    NtUserQueryWindow:
+      disable: false
+      hook: antianti.dll::_HookedNtUserQueryWindow@.*
+      remark: ""
+    NtUserBuildHwndList_Eight:
+      disable: false
+      hook: antianti.dll::_HookedNtUserBuildHwndList_Eight@.*
+      remark: ""
 keyValue:
-  hello: world
-
+  print_buffer: true
 exchange: true
+logger:
+  disable: false
+  udp_port: 0
+  udp_addr: localhost

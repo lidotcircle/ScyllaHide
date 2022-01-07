@@ -27,6 +27,8 @@ bool PEInfoWindow::show() {
     
     if (ImGui::Begin(this->m_title.c_str(), &this->visibility())) {
         if (ImGui::CollapsingHeader("导出符号")) {
+            ImGui::Text("exports (%d):", this->m_exports.size());
+
             if (ImGui::BeginTable("##export_table", 2)) {
                 ImGui::TableSetupColumn("符号名");
                 ImGui::TableSetupColumn("操作", ImGuiTableColumnFlags_WidthFixed, 50);

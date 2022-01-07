@@ -177,6 +177,9 @@ bool GuiSplugInlineHook::show() {
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("删除此模块");
             }
+
+            ImGui::SameLine();
+            ImGui::Text("Count = %d", (int)hooks.size());
         }
 
         vector<size_t> delete_s;

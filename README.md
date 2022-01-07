@@ -31,3 +31,39 @@ $ mkdir build && cd build
 $ cmake -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Release ..
 $ nmake
 ```
+
+### Configuration
+
+配置文件 [scylla.yaml](./Scylla/scylla.yaml) 是个 YAML 文件, 主要分为几个模块, 下面简要说明比较重要的
+
+
+#### DLL Injection
+
+DLL 注入模块可以选择多个 DLL 文件进行注入, 可选的方式是 *远程线程注入* 和 *内存注入*.
+远程线程注入在调试中, 或者在所有线程暂停(WIN7, WIN10可以 FIXME)时不可用,
+内存注入不能运行DLL的初始化函数, 所以DLL中的初始化数据结构会处于不正确的状态.
+
+#### Inline Hook
+
+inline hook 支持正则表达式进行导出符号的指定, 当然一个正则表达式应该只匹配到DLL导出符号中的一个.  
+有三种语法格式:
+``` yaml
+ntdll::NtClose: antiant.dll::HookedNtClose  # 1. 导出符号
+ntdll::NtClose: antiant.dll$0x333000        # 2. RVA
+ntdll::NtClose: antiant.dll#0x22000         # 3. 文件偏移, 暂未实现
+```
+
+可以分模块指定:
+``` yaml
+ntdll.dll:
+  NtClose: antianti.dll::HookedNtClose
+kernel32.dll:
+  OutputDebugStringA: antianti.dll::HookedOutputDebugStringA
+```
+
+可以直接指定内存地址
+``` yaml
+0x100000: 0x343333
+```
+
+Hook 的数据会被写入到 注入的DLL中, DLL可以用这些数据获得 Hook 的 Trampoline 函数(原始语义), 用法见 [MonitorLibrary](./MonitorLibrary)

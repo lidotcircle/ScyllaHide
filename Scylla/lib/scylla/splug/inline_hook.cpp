@@ -87,9 +87,14 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
 
             auto& exports = rmod->exports();
             string truefunc;
-            auto rva = rmod->resolve_export(regex(func, std::regex_constants::ECMAScript), truefunc);
-            addr = rmod->baseaddr() + rva;
-            func = truefunc;
+
+            try {
+                auto rva = rmod->resolve_export(regex(func, std::regex_constants::ECMAScript), truefunc);
+                addr = rmod->baseaddr() + rva;
+                func = truefunc;
+            } catch (const exception& e) {
+                throw runtime_error(expr + ": " + e.what());
+            }
         } else {
             throw runtime_error("invalid inline hook target '" + expr + "'");
         }
@@ -133,6 +138,9 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
         if (not_module) {
             add_hook(str, val);
         } else {
+            if (val["disable"].as<bool>(false))
+                continue;
+
             for (auto it=val.begin();it!=val.end();it++) {
                 string kn = str;
                 auto k = it->first.as<string>();

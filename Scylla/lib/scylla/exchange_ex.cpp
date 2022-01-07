@@ -63,7 +63,7 @@ void ExchangeDataMX::dump_to_process(void* addr) {
         ne.hook = entry.hook;
         ne.trampoline = entry.trampoline;
         void* a1 = this->m_process->malloc(entry.dllname.size() + 1, 1, mem_protect);
-        void* a2 = this->m_process->malloc(entry.dllname.size() + 1, 1, mem_protect);
+        void* a2 = this->m_process->malloc(entry.funcname.size() + 1, 1, mem_protect);
         auto f1 = defer([&]() {if (a1 && !k_success) this->m_process->free(a1); });
         auto f2 = defer([&]() {if (a2 && !k_success) this->m_process->free(a2); });
 

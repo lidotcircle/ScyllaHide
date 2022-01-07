@@ -1,6 +1,14 @@
 #pragma once
 #include <Windows.h>
-#include "../SCMRevGen/scmrev.h"
+
+// TODO
+#define GIT_VERSION_NUMBER 832
+#define GIT_SHORT_HASH_A "a80e5fb"
+#define GIT_SHORT_HASH_W L"a80e5fb"
+#define COMPILE_DATE_A "2022-01-07 10:19"
+#define COMPILE_DATE_W L"2022-01-07 10:19"
+#define COMPILE_YEAR_A "2022"
+#define COMPILE_YEAR_W L"2022"
 
 #define STRA(x) #x
 #define STRW(x) L#x

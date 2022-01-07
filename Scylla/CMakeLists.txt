@@ -12,6 +12,7 @@ target_link_libraries(scylla PUBLIC cxxopts)
 target_link_libraries(scylla PUBLIC pe-parser-static)
 target_link_libraries(scylla PUBLIC yaml-cpp::yaml-cpp)
 target_link_libraries(scylla PRIVATE HookLibraryResource)
+target_link_libraries(scylla PRIVATE MonitorLibraryResource)
 target_compile_definitions(scylla PUBLIC YAML_CPP_STATIC_DEFINE=1)
 
 set(scylla_conf_file ${CMAKE_CURRENT_LIST_DIR}/scylla.yaml)

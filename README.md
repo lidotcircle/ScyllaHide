@@ -1,28 +1,33 @@
-# ScyllaHide
+## ScyllaMonitor
 
-[![Build status](https://ci.appveyor.com/api/projects/status/0ia5b6ln4twwqwjm?svg=true)](https://ci.appveyor.com/project/x64dbg/scyllahide)
+fork from [ScyllaHide](https://github.com/x64dbg/ScyllaHide)
 
-ScyllaHide is an advanced open-source x64/x86 user mode Anti-Anti-Debug library. It hooks various functions to hide debugging. This tool is intended to stay in user mode (ring 3). If you need kernel mode (ring 0) Anti-Anti-Debug, please see [TitanHide](https://github.com/mrexodia/titanhide). Forked from [NtQuery/ScyllaHide](https://bitbucket.org/NtQuery/scyllahide).
+### Repository Structure
 
-ScyllaHide supports various debuggers through plugins:
+- [Scylla](./Scylla) 主要的库, 包含了 Scylla 的主要功能
+- [ScyllaGUI](./ScyllaGUI) 对应Scylla功能的GUI, 使用[Dear ImGui](https://github.com/ocornut/imgui)构建界面
+- [ScyllaStandalone](./ScyllaStandalone) ScyllaMonitor的 exe 可执行文件版本
+- [InjectorCLI](./InjectorCLI) ScyllaMonitor的命令行版本
+- [asplugin](./asplugin) ScyllaMonitor的插件版本
+  - [x64dbg](./asplugin/x64dbg) x64dbg插件
+- [sexchange](./sexchange) 用在DLL注入的数据结构, 注入的DLL可以通过这个结构来获取ScyllaMonitor日志UDP端口、配置等信息
+- [slogger](./slogger) ScyllaMonitor的日志系统
+- [smalloc](./smalloc) 基于VirtualAlloc的简单内存分配器, 由于内存注入的DLL无法初始化vcrt, 所以需要用这个库。所以编写用于内存注入的DLL时, 使用这个库的函数分配内存, 例子见[MonitorLibrary](./MonitorLibrary)。
+- [sutils](./sutils) 常用的工具函数
+- [HookLibrary](./HookLibrary) 包含反反调试Hook函数的DLL, 来自[ScyllaHide](https://github.com/x64dbg/ScyllaHide/HookLibrary), 这个库内置在ScyllaMonitor中 
+- [MonitorLibrary](./MonitorLibrary) 一些系统函数的Hook函数, 待完善, 这个库也内置在ScyllaMonitor中
+- [ScyllaTest](./ScyllaTest) 测试用的 exe 可执行文件, 用来测试ScyllaMonitor的功能, PEB反反调试
+- [3rdparty](./3rdparty) 第三方库
 
-- OllyDbg [v1](http://www.ollydbg.de) and [v2](http://www.ollydbg.de/version2.html)
-- [x64dbg](https://x64dbg.com)
-- [Hex-Rays IDA](https://www.hex-rays.com/products/ida/) v6 (not supported)
-- TitanEngine v2 ([original](http://www.reversinglabs.com/open-source/titanengine.html) and [updated](https://github.com/x64dbg/TitanEngine/) versions)
 
-PE x64 debugging is fully supported with plugins for x64dbg and IDA.
+### Build
 
-Please note that ScyllaHide is not limited to these debuggers. You can use the standalone command line version of ScyllaHide. You can inject ScyllaHide into any process debugged by any debugger.
+使用CMake构建生成工具, 需要安装Visual Studio, 使用nmake进行构建  
+**注意:** 构建前需要拉取所有的子仓库
 
-More information is available in the [documentation](https://github.com/x64dbg/ScyllaHide/releases/download/docs-2019-05-17/ScyllaHide.pdf) (PDF).
-
-## License
-ScyllaHide is licensed under the [GNU General Public License v3](https://www.gnu.org/licenses/gpl-3.0.en.html).
-
-## Special thanks to
-- What for his [POISON Assembler source code](https://tuts4you.com/download.php?view.2281)
-- waliedassar for his [blog posts](http://waleedassar.blogspot.de)
-- Peter Ferrie for his [PDFs](http://pferrie.host22.com)
-- MaRKuS-DJM for [Olly Advanced](http://www.openrce.org/downloads/details/241/Olly_Advanced)
-- Lim Bio Liong for [MS Spy++ style Window Finder](http://www.codeproject.com/Articles/1698/MS-Spy-style-Window-Finder)
+``` bash
+$ vcvars32           # or vcvars64 for 64bit version
+$ mkdir build && cd build
+$ cmake -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Release ..
+$ nmake
+```

@@ -43,6 +43,9 @@ void DLLInjectState::refresh()
         if (_strnicmp(cdll_path.c_str(), ANTIANTI_DLL, sizeof(ANTIANTI_DLL)) == 0) {
             vector<char> data(hook_library_data, hook_library_data + hook_library_data_size);
             pefile = make_shared<MemoryMapPEFile>(data);
+        } else if (_strnicmp(cdll_path.c_str(), MONITORING_DLL, sizeof(MONITORING_DLL)) == 0) {
+            vector<char> data(monitor_library_data, monitor_library_data + monitor_library_data_size);
+            pefile = make_shared<MemoryMapPEFile>(data);
         } else {
             pefile = make_shared<MemoryMapPEFile>(cdll_path);
         }
@@ -61,6 +64,7 @@ GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node, bool dbgplugin_
         throw std::runtime_error("GuiSplugDllInjector: node is not a sequence");
     
     bool found_antianti = false;
+    bool found_monitor = false;
 
     for (size_t i=0;i<node.size();i++) {
         auto& item = node[i];
@@ -76,6 +80,9 @@ GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node, bool dbgplugin_
         if (dll_path == ANTIANTI_DLL) {
             state.is_internal = true;
             found_antianti = true;
+        } else if (dll_path == MONITORING_DLL) {
+            state.is_internal = true;
+            found_monitor = true;
         }
 
         if (dll_path.empty())
@@ -86,6 +93,16 @@ GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node, bool dbgplugin_
         state.refresh();
 
         this->m_dlls.push_back(state);
+    }
+
+    if (!found_monitor) {
+        DLLInjectState state;
+        state.is_internal = true;
+        strncpy(state.dll_path.get(), MONITORING_DLL, MAX_ADDR_LEN);
+        strncpy(state.exchange.get(), MONITORING_DLL_EXCHANGE_SYMBOL, MAX_ADDR_LEN);
+
+        state.refresh();
+        this->m_dlls.insert(this->m_dlls.begin(), state);
     }
 
     if (!found_antianti) {

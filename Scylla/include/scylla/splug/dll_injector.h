@@ -28,6 +28,8 @@ struct InjectDLLInfo: public ScyllaContextItem {
 
 extern const unsigned char*  hook_library_data;
 extern const size_t          hook_library_data_size;
+extern const unsigned char*  monitor_library_data;
+extern const size_t          monitor_library_data_size;
 
 } // namespace scylla
 

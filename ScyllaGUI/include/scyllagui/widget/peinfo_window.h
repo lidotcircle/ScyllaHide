@@ -10,10 +10,14 @@
 
 class PEInfoWindow : public UIElement {
 private:
+    using addr_t = MapPEModule::addr_t;
     std::shared_ptr<MemoryMapPEFile> m_pefile;
-    std::vector<std::string> m_exports;
     std::string m_modulename;
     std::string m_title;
+
+    void show_basic_info() const;
+    void show_exports() const;
+    void show_imports() const;
 
 public:
     PEInfoWindow();

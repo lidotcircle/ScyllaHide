@@ -104,7 +104,7 @@ static vector<char> RedirectRelativeJmp(void* old_addr, void* new_addr, const ve
     decomposerCi.codeOffset = (LONG_PTR)old_addr;
     decomposerCi.dt = DecodingType;
     shared_ptr<_DInst> dresult(new _DInst[instrucs.size()], std::default_delete<_DInst[]>());
-    size_t DecodedInstructionsCount = 0;
+    unsigned int DecodedInstructionsCount = 0;
 
     if (!distorm_decompose(&decomposerCi, dresult.get(), instrucs.size(), &DecodedInstructionsCount))
         return vector<char>();

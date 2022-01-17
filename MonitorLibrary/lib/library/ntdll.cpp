@@ -7,7 +7,7 @@
 #include <stdexcept>
 
 
-DLLExport_C NTSTATUS NTAPI HookedNtWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG BufferSize, PULONG NumberofBytesWritten)
+DLLExport_C NTSTATUS NTAPI HookedNtWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, SIZE_T BufferSize, PSIZE_T NumberofBytesWritten)
 {
     auto& client = logClient();
     client.info("NtWriteVirtualMemory(ProcessHandle = %d, BaseAddress = 0x%08x, \n"
@@ -38,7 +38,7 @@ DLLExport_C NTSTATUS NTAPI HookedNtWriteVirtualMemory(HANDLE ProcessHandle, PVOI
     return dNtWriteVirtualMemory(ProcessHandle, BaseAddress, Buffer, BufferSize, NumberofBytesWritten);
 }
 
-DLLExport_C NTSTATUS NTAPI HookedNtReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToRead, PULONG NumberOfBytesReaded)
+DLLExport_C NTSTATUS NTAPI HookedNtReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, SIZE_T NumberOfBytesToRead, PSIZE_T NumberOfBytesReaded)
 {
     auto& client = logClient();
     client.info("NtReadVirtualMemory(ProcessHandle = %d, BaseAddress = 0x%08x, \n"

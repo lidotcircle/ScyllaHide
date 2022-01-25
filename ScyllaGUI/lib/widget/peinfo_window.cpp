@@ -87,9 +87,11 @@ void PEInfoWindow::show_imports() const
 
     if (ImGui::CollapsingHeader("导入符号")) {
         for (auto& dll_imports: imports) {
-            ImGui::Text("imports (%d):", imports.size());
+            auto& dll_name = dll_imports.first;
+            auto& imports = dll_imports.second;
+            const auto treenode_name = dll_name + " (" + to_string(imports.size()) + ")";
 
-            if (ImGui::TreeNode(dll_imports.first.c_str())) {
+            if (ImGui::TreeNode(treenode_name.c_str())) {
                 if (ImGui::BeginTable("##import_table", 3)) {
                     ImGui::TableSetupColumn("符号名");
                     ImGui::TableSetupColumn("IAT Entry");
@@ -97,23 +99,37 @@ void PEInfoWindow::show_imports() const
                     ImGui::TableHeadersRow();
 
                     size_t i = 0;
-                    for (auto it = exports.begin(); it != exports.end(); ++it, ++i) {
+                    for (auto it = imports.begin(); it != imports.end(); ++it, ++i) {
+                        auto& entry = it->first;
+                        auto  addr = it->second;
                         auto& kv = it->second;
                         ImGui::PushID(i);
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
-                        ImGui::Text(kv.first.c_str());
+                        if (entry.is_ordinal()) {
+                            ImGui::Text("%d", entry.ordinal());
+                        } else {
+                            ImGui::Text("%s", entry.symbolname().c_str());
+                        }
 
                         ImGui::TableNextColumn();
-        #ifdef _WIN64
-                        ImGui::Text("0x%016X", kv.second);
-        #else
-                        ImGui::Text("0x%08X", kv.second);
-        #endif
+#ifdef _WIN64
+                        ImGui::Text("0x%016X", addr);
+#else
+                        ImGui::Text("0x%08X", addr);
+#endif
 
                         ImGui::TableNextColumn();
                         if (ImGui::Button("复制")) {
-                            string str = this->m_modulename + "::" + kv.first;
+                            const auto is_ordinal = entry.is_ordinal();
+                            string str;
+                            if (!is_ordinal) {
+                                str = dll_name + "::" + entry.symbolname();
+                            } else {
+                                // TODO
+                                str = dll_name + "$" + std::to_string(addr);
+                            }
+
                             ImGui::SetClipboardText(str.c_str());
                         }
 
@@ -124,8 +140,5 @@ void PEInfoWindow::show_imports() const
                 }
             }
         }
-    }
-
-    if (ImGui::CollapsingHeader("导入符号")) {
     }
 }

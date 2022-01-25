@@ -1,7 +1,24 @@
 #include "smalloc.h"
 #include <Windows.h>
 
-#define __abort(msg) (void)0
+#define __abort(msg) \
+    { \
+        DebugBreak(); \
+        MessageBoxA(NULL, msg, "Error", MB_OK | MB_ICONERROR); \
+        TerminateProcess(GetCurrentProcess(), 1); \
+    }
+
+#ifdef _DEBUG
+#define SMALLOC_DEBUG
+#endif
+
+#ifdef SMALLOC_DEBUG
+#ifdef _WIN64
+#define SLOT_MAGIC 0x4C534C4C4C4C4C4C
+#else
+#define SLOT_MAGIC 0xDEADBEEF
+#endif
+#endif
 
 
 struct page_header {
@@ -11,12 +28,14 @@ struct page_header {
 };
 
 struct slot_header {
+#ifdef SMALLOC_DEBUG
+    size_t slot_magic;
+#endif
     size_t m_size;
     page_header* m_page;
     bool   m_free;
-    void*  m_ptr;
 };
-constexpr size_t slot_header_size = offsetof(slot_header, m_ptr);
+
 
 static void* os_alloc_page(size_t size)
 {
@@ -62,10 +81,12 @@ static page_header* alloc_page(size_t size)
 
     auto _n = reinterpret_cast<size_t>(page) + sizeof(page_header);
     auto first_slot = reinterpret_cast<slot_header*>(_n);
+#ifdef SMALLOC_DEBUG
+    first_slot->slot_magic = SLOT_MAGIC;
+#endif
     first_slot->m_free = true;
     first_slot->m_page = page;
     first_slot->m_size = nsize - sizeof(page_header);
-    first_slot->m_ptr  = &first_slot->m_ptr;
 
     return page;
 }
@@ -73,15 +94,17 @@ static page_header* alloc_page(size_t size)
 static page_header* page_list = nullptr;
 static void adjust_slot(slot_header* sh, size_t size) {
     size = aligned_size(size, sizeof(void*));
-    if (sh->m_size <= size + slot_header_size + sizeof(void*))
+    if (sh->m_size <= size + sizeof(slot_header) + sizeof(void*))
         return;
     
     auto _n = reinterpret_cast<size_t>(sh) + size;
     auto nsh = reinterpret_cast<slot_header*>(_n);
+#ifdef SMALLOC_DEBUG
+    nsh->slot_magic = sh->slot_magic;
+#endif
     nsh->m_free = true;
     nsh->m_page = sh->m_page;
-    nsh->m_size = sh->m_size - size - slot_header_size;
-    nsh->m_ptr  = &nsh->m_ptr;
+    nsh->m_size = sh->m_size - size;
 
     sh->m_size = size;
 }
@@ -91,15 +114,20 @@ static void* alloc_slot_from_page(page_header* page, size_t size)
     auto _n = reinterpret_cast<size_t>(page) + sizeof(page_header);
     auto slot = reinterpret_cast<slot_header*>(_n);
     auto page_end = reinterpret_cast<size_t>(page) + page->m_size;
-    size += slot_header_size;
+    size += sizeof(slot_header);
 
     do {
+#ifdef SMALLOC_DEBUG
+        if (slot->slot_magic != SLOT_MAGIC)
+            __abort("slot magic error");
+#endif
+
         if (slot->m_free && slot->m_size >= size)
         {
             adjust_slot(slot, size);
             slot->m_free = false;
             slot->m_page->m_used += size;
-            return &slot->m_ptr;
+            return &slot[1];
         }
         slot = reinterpret_cast<slot_header*>(reinterpret_cast<size_t>(slot) + slot->m_size);
     } while (reinterpret_cast<size_t>(slot) < page_end);
@@ -128,12 +156,16 @@ static void* alloc_slot(size_t size)
 static void merge_slot(slot_header* sh)
 {
     auto _n = reinterpret_cast<size_t>(sh) + sh->m_size;
-    if (_n >= sh->m_page->m_size + reinterpret_cast<size_t>(sh->m_page))
-        return;
+    if (_n < sh->m_page->m_size + reinterpret_cast<size_t>(sh->m_page)) {
+        auto nsh = reinterpret_cast<slot_header*>(_n);
+#ifdef SMALLOC_DEBUG
+        if (nsh->slot_magic != SLOT_MAGIC)
+            __abort("slot magic error");
+#endif
 
-    auto nsh = reinterpret_cast<slot_header*>(_n);
-    if (nsh->m_free)
-        sh->m_size += nsh->m_size;
+        if (nsh->m_free)
+            sh->m_size += nsh->m_size;
+    }
 }
 
 extern "C" void* smalloc(size_t size) {
@@ -149,7 +181,11 @@ extern "C" void* smalloc_aligned(size_t size, size_t alignment) {
 }
 
 extern "C" void  sfree(void* ptr) {
-    auto sh = reinterpret_cast<slot_header*>(reinterpret_cast<size_t>(ptr) - slot_header_size);
+    auto sh = reinterpret_cast<slot_header*>(reinterpret_cast<size_t>(ptr) - sizeof(slot_header));
+#ifdef SMALLOC_DEBUG
+    if (sh->slot_magic != SLOT_MAGIC)
+        __abort("sfree failed: bad magic");
+#endif
     if (sh->m_free)
         __abort("invalid sfree");
 

@@ -62,4 +62,17 @@ deferred_call<F> defer(F&& f)
     return deferred_call<F>(std::forward<F>(f));
 }
 
+
+template <typename T,typename = typename std::enable_if<std::is_integral<T>::value>::type>
+std::string to_hexstring(T t, bool padding2ptrwidth = true)
+{
+    std::stringstream ss;
+    ss << std::hex << t;
+
+    if (!padding2ptrwidth)
+        return ss.str();
+
+    return  string(2 * sizeof(void*) - ss.str().size(), '0') + ss.str();
+}
+
 #endif // _UTILS_HPP_

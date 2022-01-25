@@ -36,8 +36,11 @@ static vector<char> WriteJumper(void* lpbFrom, void* lpbTo, bool prefixNop)
     if (prefixNop)
         vb.push_back(0x90);
 
+    // jmp far [rel32]
     vb.push_back(0xFF);
     vb.push_back(0x25);
+    vb.push_back(0x00);
+    vb.push_back(0x00);
     vb.push_back(0x00);
     vb.push_back(0x00);
     DWORD_PTR dwRel = (DWORD_PTR)lpbTo;

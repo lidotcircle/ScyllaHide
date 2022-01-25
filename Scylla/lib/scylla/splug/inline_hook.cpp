@@ -1,6 +1,7 @@
 #include "process/map_pe_module.h"
 #include "scylla/splug/inline_hook.h"
 #include "scylla_constants.h"
+#include "utils.hpp"
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -115,9 +116,9 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
             hooks.push_back(
                 make_tuple(get<0>(original_info), get<0>(hook_info), 
                            get<1>(original_info), get<2>(original_info)));
-        logger->info("inline hook: %s(0x%lx) -> %s(0x%lx)",
-                     original_target.c_str(), (long)get<0>(original_info),
-                     hook_target_expr.c_str(), (long)get<0>(hook_info));
+        logger->info("inline hook: %s(0x%s) -> %s(0x%s)",
+                     original_target.c_str(), to_hexstring(get<0>(original_info)).c_str(),
+                     hook_target_expr.c_str(), to_hexstring(get<0>(hook_info)).c_str());
         } catch (const exception& e) {
             throw runtime_error("inline hook rule error: " + string(e.what()));
         }

@@ -13,7 +13,7 @@ private:
     bool flush_on_get_value;
 
 public:
-    using addr_t = size_t;
+    using addr_t = uintptr_t;
     MemIndexable();
 
     virtual ~MemIndexable() = default;

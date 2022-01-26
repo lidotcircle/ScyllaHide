@@ -91,11 +91,34 @@ public:
     addr_t resolve_export(const std::string& module_name, const std::string& export_name) const;
     addr_t resolve_export(const std::string& module_name, uint32_t ordinal) const;
     addr_t resolve_export(const std::string& module_name, const std::regex& regex, std::string& symbol) const;
+    struct AddressExprInfo {
+        addr_t addr;
+        std::string module;
+        std::string symbol;
+    };
+    AddressExprInfo resolve_address_expression(const std::string& expr) const;
     
     suspend_t suspendThread();
     bool resumeThread(suspend_t handle);
 
     void refresh();
+
+
+public:
+    class PatchHandle {
+    public:
+        virtual ~PatchHandle() = default;
+        virtual addr_t addr() const = 0;
+        virtual const std::vector<char>& original_data() const = 0;
+    };
+    using patch_t = std::unique_ptr<PatchHandle>;
+
+    patch_t patch(addr_t addr, const std::vector<char>& data);
+    patch_t patch(addr_t addr, uint8_t val);
+    patch_t patch(addr_t addr, uint16_t val);
+    patch_t patch(addr_t addr, uint32_t val);
+    patch_t patch(addr_t addr, uint64_t val);
+    void  unpatch(patch_t patch);
 };
 
 using WinProcess_t = std::shared_ptr<WinProcessNative>;

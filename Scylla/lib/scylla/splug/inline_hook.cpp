@@ -21,14 +21,7 @@ SPlugInlineHook::~SPlugInlineHook() {}
 static inline bool strStartWith(const string& str, const string& prefix) {
     return str.compare(0, prefix.size(), prefix) == 0;
 }
-static addr_t parseAddr(const string& str) {
-    size_t len;
-    addr_t addr = stoull(str, &len, 16);
-    if (len != str.size())
-        throw runtime_error("invalid address");
 
-    return addr;
-}
 /**
  * Rule Spec:
  * 
@@ -64,44 +57,8 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
 
     vector<tuple<addr_t,addr_t,string,string>> hooks;
     auto resolve_expr = [&](const string& expr) {
-        addr_t addr;
-        string mod, func;
-
-        if (strStartWith(expr, "0x")) {
-            addr = parseAddr(expr);
-        } else if (expr.find('#') != string::npos) {
-            throw runtime_error("not implemented");
-        } else if (expr.find('$') != string::npos) {
-            mod = expr.substr(0, expr.find('$'));
-            auto offset = expr.substr(expr.find('$') + 1);
-            auto rmod = process->find_module(mod);
-            if (!rmod)
-                throw runtime_error("module '" + mod + "'not found");
-
-            addr = rmod->baseaddr() + parseAddr(offset);
-        } else if (expr.find("::") != string::npos) {
-            mod = expr.substr(0, expr.find("::"));
-            func = expr.substr(expr.find("::") + 2);
-            auto rmod = process->find_module(mod);
-            if (!rmod)
-                throw runtime_error("module '" + mod + "'not found");
-
-            auto& exports = rmod->exports();
-            string truefunc;
-
-            try {
-                // TODO resolve forwarder chain
-                auto exp_entry = rmod->resolve_export(regex(func, std::regex_constants::ECMAScript), truefunc);
-                addr = rmod->baseaddr() + exp_entry.m_rva;
-                func = truefunc;
-            } catch (const exception& e) {
-                throw runtime_error(expr + ": " + e.what());
-            }
-        } else {
-            throw runtime_error("invalid inline hook target '" + expr + "'");
-        }
-
-        return make_tuple(addr, mod, func);
+        auto res = process->resolve_address_expression(expr);
+        return make_tuple(res.addr, res.module, res.symbol);
     };
     auto add_hook = [&](const string& original_target, const YAML::Node& hook_target) {
         if (!hook_target.IsMap())

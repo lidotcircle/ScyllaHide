@@ -378,7 +378,7 @@ const map<string,map<ImportEntry,addr_t>>& MapPEModule::imports() const {
             auto c = this->get_at(imp_entry.NameRVA + i);
             if (c == '\0')
                 break;
-            dllname += c;
+            dllname += tolower(c);
         }
 
         map<ImportEntry,addr_t> dllimport;

@@ -3,6 +3,7 @@
 #include "scylla/splug/log_server.h"
 #include "scylla/splug/dll_injector.h"
 #include "scylla/splug/inline_hook.h"
+#include "scylla/splug/iat_hook.h"
 #include "scylla/splug/key_value.h"
 #include "scylla/splug/exchange.h"
 #include "scylla/splug/peb_patch.h"
@@ -21,6 +22,7 @@ Charybdis::Charybdis(WinProcess_t process)
     m_splug_manager->add_splug("dllInjector", [](auto ctx) { return make_unique<SPlugDLLInjector>(ctx); });
     m_splug_manager->add_splug("keyValue",    [](auto ctx) { return make_unique<SPlugKeyValue>(ctx); });
     m_splug_manager->add_splug("inlineHook",  [](auto ctx) { return make_unique<SPlugInlineHook>(ctx); });
+    m_splug_manager->add_splug("IATHook",     [](auto ctx) { return make_unique<SPlugIATHook>(ctx); });
     m_splug_manager->add_splug("exchange",    [](auto ctx) { return make_unique<SPlugExchange>(ctx); });
     m_splug_manager->add_splug("pebPatch",    [](auto ctx) { return make_unique<SPlugPebPatch>(ctx); });
 }

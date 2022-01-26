@@ -18,3 +18,6 @@ set(scylla_conf_file ${CMAKE_CURRENT_LIST_DIR}/scylla.yaml)
 add_custom_target(scylla_conf ALL
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
     ${scylla_conf_file} ${CMAKE_BINARY_DIR})
+
+install(FILES ${scylla_conf_file} DESTINATION ${CMAKE_INSTALL_PREFIX})
+install(FILES ${scylla_conf_file} DESTINATION ${CMAKE_INSTALL_PREFIX}/x64dbg)

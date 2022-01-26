@@ -15,3 +15,5 @@ set_target_properties(plug_x64dbg PROPERTIES OUTPUT_NAME "scyllamon")
 
 # Set plugin name based on the target
 target_compile_definitions(plug_x64dbg PRIVATE "-DPLUGIN_NAME=\"scyllamon\"")
+
+install(TARGETS plug_x64dbg DESTINATION ${CMAKE_INSTALL_PREFIX}/x64dbg)

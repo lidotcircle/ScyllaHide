@@ -15,3 +15,5 @@ target_include_directories(InjectorCLI PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 target_link_libraries(InjectorCLI cxxopts)
 target_link_libraries(InjectorCLI scylla)
 target_link_libraries(InjectorCLI HookLibraryResource)
+
+install(TARGETS InjectorCLI DESTINATION ${CMAKE_INSTALL_PREFIX})

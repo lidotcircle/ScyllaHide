@@ -68,7 +68,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    int allspec = result.count("pid") + result.count("name") + result.count("new");
+    auto allspec = result.count("pid") + result.count("name") + result.count("new");
     if (allspec != 1) {
         cerr << "only and at least one target process should be specified" << endl;
         return 1;

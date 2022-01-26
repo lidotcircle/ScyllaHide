@@ -10,4 +10,4 @@ function(create_resource_c res_file c_variable output_file)
     file(APPEND ${output_file} "const unsigned char ${c_variable}[] = {${filedata}};\nconst unsigned ${c_variable}_size = sizeof(${c_variable});\n")
 endfunction()
 
-create_resource_c("${HL_FILENAME}" monitor_library "${CMAKE_CURRENT_BINARY_DIR}/monitor_library.h")
+create_resource_c("${LIB_FILENAME}" monitor_library "${HEADER_FILENAME}")

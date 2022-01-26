@@ -29,11 +29,15 @@ target_compile_options(HookLibrary PRIVATE
 #target_compile_definitions(HookLibrary PRIVATE NOT_USING_MSVC_ENTRY=1)
 
 set(HookLibraryOutputFile $<TARGET_FILE:HookLibrary>)
-add_custom_target(generate_c_resource COMMAND ${CMAKE_COMMAND} 
-                    -DHL_FILENAME="${HookLibraryOutputFile}"
-                    -P ${CMAKE_CURRENT_LIST_DIR}/HookLibraryResource.cmake)
-add_dependencies(generate_c_resource HookLibrary)
+set(DLL_DATA_HEADER_FILE "${CMAKE_CURRENT_BINARY_DIR}/hook_library.h")
+add_custom_command(OUTPUT ${DLL_DATA_HEADER_FILE}
+                   COMMAND ${CMAKE_COMMAND} 
+                        -DLIB_FILENAME="${HookLibraryOutputFile}"
+                        -DHEADER_FILENAME="${DLL_DATA_HEADER_FILE}"
+                        -P ${CMAKE_CURRENT_LIST_DIR}/HookLibraryResource.cmake
+                   DEPENDS HookLibrary)
+add_custom_target(generate_monitor_header DEPENDS ${DLL_DATA_HEADER_FILE})
 
 add_library(HookLibraryResource INTERFACE)
 target_include_directories(HookLibraryResource INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
-add_dependencies(HookLibraryResource generate_c_resource)
+add_dependencies(HookLibraryResource generate_monitor_header)

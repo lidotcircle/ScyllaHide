@@ -10,4 +10,4 @@ function(create_resource_c res_file c_variable output_file)
     file(APPEND ${output_file} "const unsigned char ${c_variable}[] = {${filedata}};\nconst unsigned ${c_variable}_size = sizeof(${c_variable});\n")
 endfunction()
 
-create_resource_c("${HL_FILENAME}" hook_library "${CMAKE_CURRENT_BINARY_DIR}/hook_library.h")
+create_resource_c("${LIB_FILENAME}" hook_library "${HEADER_FILENAME}")

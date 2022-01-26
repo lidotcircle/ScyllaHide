@@ -24,11 +24,15 @@ target_compile_options(MonitorLibrary PRIVATE
 #target_compile_definitions(MonitorLibrary PRIVATE NOT_USING_MSVC_ENTRY=1)
 
 set(MonitorLibraryOutputFile $<TARGET_FILE:MonitorLibrary>)
-add_custom_target(generate_c_resource_monitor COMMAND ${CMAKE_COMMAND} 
-                    -DHL_FILENAME="${MonitorLibraryOutputFile}"
-                    -P ${CMAKE_CURRENT_LIST_DIR}/MonitorLibraryResource.cmake)
-add_dependencies(generate_c_resource_monitor MonitorLibrary)
+set(DLL_DATA_HEADER_FILE "${CMAKE_CURRENT_BINARY_DIR}/monitor_library.h")
+add_custom_command(OUTPUT ${DLL_DATA_HEADER_FILE}
+                   COMMAND ${CMAKE_COMMAND} 
+                        -DLIB_FILENAME="${MonitorLibraryOutputFile}"
+                        -DHEADER_FILENAME="${DLL_DATA_HEADER_FILE}"
+                        -P ${CMAKE_CURRENT_LIST_DIR}/MonitorLibraryResource.cmake
+                  DEPENDS MonitorLibrary)
+add_custom_target(generate_hooklib_header DEPENDS ${DLL_DATA_HEADER_FILE})
 
 add_library(MonitorLibraryResource INTERFACE)
 target_include_directories(MonitorLibraryResource INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
-add_dependencies(MonitorLibraryResource generate_c_resource_monitor)
+add_dependencies(MonitorLibraryResource generate_hooklib_header)

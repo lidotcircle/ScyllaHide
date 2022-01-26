@@ -1,7 +1,6 @@
 
 file(GLOB_RECURSE scylla_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/lib/**.cpp)
 add_library(scylla STATIC ${scylla_SOURCES})
-target_include_directories(scylla PUBLIC ${CMAKE_CURRENT_LIST_DIR})
 target_include_directories(scylla PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 target_link_libraries(scylla PUBLIC ntdll)
 target_link_libraries(scylla PUBLIC sexchange)

@@ -1,4 +1,5 @@
 #include "process/mem_indexable.h"
+using namespace std;
 
 
 #define GET_VAL(type) { \
@@ -72,4 +73,17 @@ double MemIndexable::get_double(addr_t index) const {
 }
 void MemIndexable::set_double(addr_t index, double value) {
     SET_VAL(double, value);
+}
+
+
+string MemIndexable::get_nullterm_string(addr_t index) const
+{
+    string ret;
+    while (true) {
+        char c = this->get_at(index++);
+        if (c == 0)
+            break;
+        ret += c;
+    }
+    return ret;
 }

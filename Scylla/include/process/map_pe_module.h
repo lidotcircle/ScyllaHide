@@ -48,10 +48,19 @@ class MapPEModule : public virtual MemoryMap
 public:
     using addr_t = typename MemoryMap::addr_t;
 
+    struct ExportEntry {
+        uint32_t m_ordinal;
+        std::string m_name;
+        MemoryMap::addr_t m_rva;
+        bool m_forwarder;
+        std::string m_forwarder_symbol;
+    };
+
+
 private:
     std::string mod_name;
     PEHeader m_header;
-    std::shared_ptr<std::map<uint32_t,std::pair<std::string,addr_t>>> m_exports;
+    std::shared_ptr<std::map<uint32_t,ExportEntry>> m_exports;
     std::shared_ptr<std::map<std::string,std::map<ImportEntry,addr_t>>> m_imports;
     bool m_parsed;
 
@@ -70,10 +79,10 @@ public:
 
     const PEHeader& header() const;
 
-    const std::map<uint32_t,std::pair<std::string,addr_t>>&   exports() const;
-    addr_t resolve_export(const std::string& name) const;
-    addr_t resolve_export(const std::regex& regex, std::string& symbol) const;
-    addr_t resolve_export(uint32_t ordinal) const;
+    const std::map<uint32_t,ExportEntry>&   exports() const;
+    ExportEntry resolve_export(const std::string& name) const;
+    ExportEntry resolve_export(const std::regex& regex, std::string& symbol) const;
+    ExportEntry resolve_export(uint32_t ordinal) const;
     const std::map<std::string,std::map<ImportEntry,addr_t>>& imports() const;
 
     bool relocatable() const;

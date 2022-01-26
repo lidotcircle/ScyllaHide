@@ -58,18 +58,18 @@ void PEInfoWindow::show_exports() const
                 ImGui::PushID(i);
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                ImGui::Text(kv.first.c_str());
+                ImGui::Text(kv.m_name.c_str());
 
                 ImGui::TableNextColumn();
 #ifdef _WIN64
-                ImGui::Text("0x%016X", kv.second);
+                ImGui::Text("0x%016X", kv.m_rva);
 #else
-                ImGui::Text("0x%08X", kv.second);
+                ImGui::Text("0x%08X", kv.m_rva);
 #endif
 
                 ImGui::TableNextColumn();
                 if (ImGui::Button("复制")) {
-                    string str = this->m_modulename + "::" + kv.first;
+                    string str = this->m_modulename + "::" + kv.m_name;
                     ImGui::SetClipboardText(str.c_str());
                 }
 
@@ -107,7 +107,7 @@ void PEInfoWindow::show_imports() const
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
                         if (entry.is_ordinal()) {
-                            ImGui::Text("%d", entry.ordinal());
+                            ImGui::Text("#%d", entry.ordinal());
                         } else {
                             ImGui::Text("%s", entry.symbolname().c_str());
                         }
@@ -138,6 +138,8 @@ void PEInfoWindow::show_imports() const
 
                     ImGui::EndTable();
                 }
+
+                ImGui::TreePop();
             }
         }
     }

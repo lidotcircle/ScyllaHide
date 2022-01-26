@@ -7,6 +7,7 @@ using namespace std;
 using namespace peparse;
 
 using addr_t = typename MapPEModule::addr_t;
+using ExportEntry = typename MapPEModule::ExportEntry;
 
 ImportEntry::ImportEntry(uint16_t ordinal)
 {
@@ -193,7 +194,7 @@ const PEHeader& MapPEModule::header() const {
     return this->m_header;
 }
 
-const map<uint32_t,pair<string,addr_t>>& MapPEModule::exports() const {
+const map<uint32_t,ExportEntry>& MapPEModule::exports() const {
     if (!this->m_parsed)
         throw runtime_error("Parsing not done yet");
 
@@ -203,7 +204,7 @@ const map<uint32_t,pair<string,addr_t>>& MapPEModule::exports() const {
     const auto& exp_dir = this->m_header.directory_export();
     if (exp_dir.VirtualAddress == 0) {
         auto _this = const_cast<MapPEModule*>(this);
-        _this->m_exports = make_shared<map<uint32_t,pair<string,addr_t>>>();
+        _this->m_exports = make_shared<map<uint32_t,ExportEntry>>();
         return *this->m_exports;
     }
 
@@ -213,12 +214,28 @@ const map<uint32_t,pair<string,addr_t>>& MapPEModule::exports() const {
         ((char*)&exp_table)[i] = c;
     }
 
-    map<uint32_t,pair<string,addr_t>> ret;
+    auto& export_directory = this->header().directory_export();
+    auto export_beg = export_directory.VirtualAddress;
+    auto export_end = export_beg + export_directory.Size;
+
+    map<uint32_t,ExportEntry> ret;
     auto numOfEntries = exp_table.AddressTableEntries;
     auto addrTableRVA = exp_table.ExportAddressTableRVA;
-    for (size_t i=0;i<numOfEntries;i++) {
-        auto entry = this->get_u32(addrTableRVA + i * 4);
-        ret[i + exp_table.OrdinalBase] = make_pair("", entry);
+    for (uint32_t i=0;i<numOfEntries;i++) {
+        auto export_rva = this->get_u32(addrTableRVA + i * 4);
+        ExportEntry e_entry;
+        e_entry.m_rva = export_rva;
+        e_entry.m_ordinal = i + exp_table.OrdinalBase;
+        e_entry.m_forwarder = export_rva >= export_beg && export_rva < export_end;
+        if (e_entry.m_forwarder) {
+            auto sym = this->get_nullterm_string(e_entry.m_rva);
+            if (sym.empty())
+                throw std::runtime_error("Forwarder symbol is empty");
+
+            e_entry.m_forwarder_symbol = sym;
+        }
+
+        ret[i + exp_table.OrdinalBase] = e_entry;
     }
 
     auto numOfNames = exp_table.NumberOfNamePointers;
@@ -233,48 +250,40 @@ const map<uint32_t,pair<string,addr_t>>& MapPEModule::exports() const {
             continue;
         }
 
-        string name;
-        for (size_t j=0;;j++) {
-            auto c = this->get_at(name_ptr + j);
-            if (c == '\0')
-                break;
-            name += c;
-        }
-
+        const string name = this->get_nullterm_string(name_ptr);
         if (name.empty()) {
             cerr << "Warning: empty name for export " << i << endl;
             continue;
         }
 
-        ret[ord + exp_table.OrdinalBase].first = name;
+        ret[ord + exp_table.OrdinalBase].m_name = name;
     }
 
     auto _this = const_cast<MapPEModule*>(this);
-    _this->m_exports = make_shared<map<uint32_t,pair<string,addr_t>>>(ret);
+    _this->m_exports = make_shared<map<uint32_t,ExportEntry>>(move(ret));
     return *_this->m_exports;
 }
 
-addr_t MapPEModule::resolve_export(const std::string& name) const {
+ExportEntry MapPEModule::resolve_export(const std::string& name) const {
     auto& exports = this->exports();
     for (auto& e: exports) {
-        if (e.second.first == name)
-            return e.second.second;
+        if (e.second.m_name == name)
+            return e.second;
     }
 
     throw runtime_error("export symbol '" + name + "' not found");
 }
 
-addr_t MapPEModule::resolve_export(const regex& re, string& symbol) const {
+ExportEntry MapPEModule::resolve_export(const regex& re, string& symbol) const {
     auto& exports = this->exports();
     bool found = false;
-    addr_t ret = 0;
+    ExportEntry ret;
 
     for (auto& e: exports) {
-        if (std::regex_match(e.second.first, re)) {
+        if (std::regex_match(e.second.m_name, re)) {
             if (found)
                 throw runtime_error("multiple symbols match regex");
-            ret = e.second.second;
-            symbol = e.second.first;
+            ret = e.second;
             found = true;
         }
     }
@@ -285,12 +294,12 @@ addr_t MapPEModule::resolve_export(const regex& re, string& symbol) const {
     return ret;
 }
 
-addr_t MapPEModule::resolve_export(uint32_t ordinal) const {
+ExportEntry MapPEModule::resolve_export(uint32_t ordinal) const {
     auto& exports = this->exports();
     if (exports.find(ordinal) == exports.end())
         throw runtime_error("export ordinal " + to_string(ordinal) + " not found");
 
-    return exports.at(ordinal).second;
+    return exports.at(ordinal);
 }
  
 const map<string,map<ImportEntry,addr_t>>& MapPEModule::imports() const {

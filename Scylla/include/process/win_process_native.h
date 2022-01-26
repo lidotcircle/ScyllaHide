@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <map>
+#include <regex>
 #include <type_traits>
 #include <windows.h>
 
@@ -86,6 +87,10 @@ public:
     void inject_dll(const std::string& dll_path, bool stealthy);
     void inject_dll(const unsigned char* buffer, size_t buffer_size,
                     const std::string& dllname, bool stealthy);
+    
+    addr_t resolve_export(const std::string& module_name, const std::string& export_name) const;
+    addr_t resolve_export(const std::string& module_name, uint32_t ordinal) const;
+    addr_t resolve_export(const std::string& module_name, const std::regex& regex, std::string& symbol) const;
     
     suspend_t suspendThread();
     bool resumeThread(suspend_t handle);

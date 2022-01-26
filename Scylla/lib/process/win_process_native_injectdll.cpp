@@ -70,9 +70,9 @@ void WinProcessNative::inject_dll_stealthy(const unsigned char* buffer,
         for (auto& func : import.second) {
             addr_t addr;
             if (func.first.is_ordinal()) {
-                addr = modmap->resolve_export(func.first.ordinal()) + modbase;
+                addr = this->resolve_export(dllname, func.first.ordinal());
             } else {
-                addr = modmap->resolve_export(func.first.symbolname()) + modbase;
+                addr = this->resolve_export(dllname, func.first.symbolname());
             }
 
             if (this->is_64bit()) {

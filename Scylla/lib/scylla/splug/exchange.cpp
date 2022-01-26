@@ -33,7 +33,8 @@ void SPlugExchange::doit(const YAML::Node& node) {
         if (rmod == nullptr)
             throw std::runtime_error("SPlugExchange::doit: module not found '" + mod + "'");
 
-        auto addr = rmod->baseaddr() + rmod->resolve_export(exch_name);
+        // TODO resolve forwarder chain
+        auto addr = rmod->baseaddr() + rmod->resolve_export(exch_name).m_rva;
         exch.dump_to_process(reinterpret_cast<void*>(addr));
     }
 }

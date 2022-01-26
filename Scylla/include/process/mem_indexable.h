@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <string>
 
 
 class MemIndexable
@@ -32,6 +33,8 @@ public:
     virtual void    set_float(addr_t index, float value);
     virtual double  get_double(addr_t index) const;
     virtual void    set_double(addr_t index, double value);
+
+    virtual std::string get_nullterm_string(addr_t index) const;
 
     void set_flush_before_get_value(bool value);
     virtual void flush();

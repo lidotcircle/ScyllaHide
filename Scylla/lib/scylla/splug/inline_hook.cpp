@@ -90,8 +90,9 @@ void SPlugInlineHook::doit(const YAML::Node& node) {
             string truefunc;
 
             try {
-                auto rva = rmod->resolve_export(regex(func, std::regex_constants::ECMAScript), truefunc);
-                addr = rmod->baseaddr() + rva;
+                // TODO resolve forwarder chain
+                auto exp_entry = rmod->resolve_export(regex(func, std::regex_constants::ECMAScript), truefunc);
+                addr = rmod->baseaddr() + exp_entry.m_rva;
                 func = truefunc;
             } catch (const exception& e) {
                 throw runtime_error(expr + ": " + e.what());

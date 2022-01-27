@@ -45,7 +45,7 @@ void SPlugIATHook::doit(const YAML::Node& node) {
         if (val["disable"].as<bool>(false))
             continue;
         
-        auto mod = process->find_module(dllmod);
+        auto mod = (dllmod == "main") ? process->main_module() : process->find_module(dllmod);
         if (mod == nullptr)
             throw runtime_error("SPlugIATHook::doti: can't find module " + dllmod);
         auto& imports = mod->imports();

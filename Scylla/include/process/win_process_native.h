@@ -58,6 +58,8 @@ public:
     std::vector<std::string> get_modules() const;
     std::shared_ptr<MapPEModule>       find_module(const std::string& name);
     const std::shared_ptr<MapPEModule> find_module(const std::string& name) const;
+    std::shared_ptr<MapPEModule>       main_module();
+    const std::shared_ptr<MapPEModule> main_module() const;
 
     void* malloc(size_t size, size_t alignment = 1, DWORD protect = PAGE_EXECUTE_READWRITE);
     void  free(void* ptr);

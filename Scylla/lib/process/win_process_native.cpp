@@ -230,6 +230,21 @@ const shared_ptr<MapPEModule> WinProcessNative::find_module(const string& name) 
     return _this->find_module(name);
 }
 
+std::shared_ptr<MapPEModule> WinProcessNative::main_module()
+{
+    char buf[MAX_PATH];
+    if (GetProcessImageFileNameA(*this->process_handle.get(), buf, sizeof(buf)) == 0)
+        throw runtime_error("GetProcessImageFileNameA failed");
+
+    return this->find_module(buf);
+}
+
+const std::shared_ptr<MapPEModule> WinProcessNative::main_module() const
+{
+    auto _this = const_cast<WinProcessNative*>(this);
+    return _this->main_module();
+}
+
 void WinProcessNative::refresh() {
     this->refresh_process();
 }

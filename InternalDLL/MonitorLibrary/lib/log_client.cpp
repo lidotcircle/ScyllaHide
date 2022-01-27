@@ -12,7 +12,7 @@ LogClient& logClient() {
 
     _logClient = new ((LogClient*)&_bytes) UDPLogClient(exchange_data.m_udp_port, exchange_data.m_udp_addr);
 
-    char hello[] = "hello server from monitor library";
+    char hello[] = "hello server from IAT Hook monitor library";
     _logClient->send(hello, sizeof(hello));
 
     return *_logClient;

@@ -4,6 +4,7 @@
 #include <type_traits>
 #include <iterator>
 #include <stdexcept>
+#include "./misc.h"
 
 template <typename FUNC>
 struct deferred_call

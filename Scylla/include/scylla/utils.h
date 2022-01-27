@@ -7,6 +7,7 @@
 #include <Windows.h>
 #include <TlHelp32.h>
 #include "process/win_process_native.h"
+#include "utils.hpp"
 
 int GetPidByProcessName(const std::string& processName);
 const char* GetProcessNameByPid(int pid);
@@ -26,8 +27,6 @@ bool SetDebugPrivileges();
 bool EnablePrivilege(LPCTSTR lpszPrivilegeName, BOOL bEnable);
 
 std::string GetFilenameFromFileHandle(HANDLE hFile);
-
-std::string GetLastErrorAsString();
 
 const char* ChooserFile(const char* filter);
 const char* SaveFileTo(const char* filter, const std::string& default);

@@ -86,7 +86,7 @@ void SPlugIATHook::doit(const YAML::Node& node) {
                 if (funcs.find(ie) == funcs.end())
                     throw runtime_error("SPlugIATHook::doti: can't find import function " + dllmod + "::" + impmod + "::" + impfunc);
 
-                auto entry = funcs.at(ie);
+                auto entry = funcs.at(ie) + mod->baseaddr();
 
                 if (!val3.IsMap())
                     throw runtime_error("expect a map for IAT hook function " + dllmod + "::" + impmod + "::" + impfunc);

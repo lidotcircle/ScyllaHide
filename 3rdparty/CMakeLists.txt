@@ -29,6 +29,9 @@ include(${CMAKE_CURRENT_LIST_DIR}/dearIMGUI.cmake)
 add_subdirectory(x64dbg)
 
 
+add_subdirectory(pe-parse)
+
+
 add_library(printf STATIC ${CMAKE_CURRENT_LIST_DIR}/printf/printf.c)
 target_include_directories(printf PUBLIC ${CMAKE_CURRENT_LIST_DIR}/printf)
 
@@ -38,17 +41,3 @@ target_compile_options(printf_MT PRIVATE
     $<$<CONFIG:>:/MT>
     $<$<CONFIG:Debug>:/MTd>
     $<$<CONFIG:Release>:/MT>)
-
-
-set(PEPARSE_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/pe-parse/pe-parser-library)
-list(APPEND PEPARSERLIB_SOURCEFILES
-  ${PEPARSE_SOURCE_DIR}/src/buffer.cpp
-  ${PEPARSE_SOURCE_DIR}/src/parse.cpp
-)
-if(MSVC)
-  list(APPEND PEPARSERLIB_SOURCEFILES ${PEPARSE_SOURCE_DIR}/src/unicode_winapi.cpp)
-else()
-  list(APPEND PEPARSERLIB_SOURCEFILES ${PEPARSE_SOURCE_DIR}/src/unicode_codecvt.cpp)
-endif()
-add_library(pe-parser-static STATIC ${PEPARSERLIB_SOURCEFILES})
-target_include_directories(pe-parser-static PUBLIC ${PEPARSE_SOURCE_DIR}/include)

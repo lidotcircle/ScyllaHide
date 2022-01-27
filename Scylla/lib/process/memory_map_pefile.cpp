@@ -1,6 +1,5 @@
 #include "process/memory_map_pefile.h"
 #include "process/pe_header.h"
-#include <pe-parse/parse.h>
 #include <stdexcept>
 #include <fstream>
 using namespace std;

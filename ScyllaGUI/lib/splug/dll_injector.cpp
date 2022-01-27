@@ -1,8 +1,8 @@
 #include "process/memory_map_pefile.h"
 #include "scylla/splug/dll_injector.h"
 #include "scyllagui/splug/dll_injector.h"
-#include "scylla_constants.h"
 #include "scylla/utils.h"
+#include "internal_dlls.h"
 #include "str_utils.h"
 #include <imgui.h>
 #include <stdexcept>
@@ -39,16 +39,18 @@ void DLLInjectState::refresh()
 
     try {
         shared_ptr<MemoryMapPEFile> pefile;
-        
-        if (_strnicmp(cdll_path.c_str(), ANTIANTI_DLL, sizeof(ANTIANTI_DLL)) == 0) {
-            vector<char> data(hook_library_data, hook_library_data + hook_library_data_size);
-            pefile = make_shared<MemoryMapPEFile>(data);
-        } else if (_strnicmp(cdll_path.c_str(), MONITORING_DLL, sizeof(MONITORING_DLL)) == 0) {
-            vector<char> data(monitor_library_data, monitor_library_data + monitor_library_data_size);
-            pefile = make_shared<MemoryMapPEFile>(data);
-        } else {
-            pefile = make_shared<MemoryMapPEFile>(cdll_path);
+        bool found_internal = false;
+        for (auto& idll: internal_dlls) {
+            if (cdll_path == idll.m_dllname) {
+                vector<char> buf((char*)idll.m_data, (char*)idll.m_data + idll.m_size);
+                pefile = make_shared<MemoryMapPEFile>(buf);
+                found_internal = true;
+                break;
+            }
         }
+
+        if (!found_internal)
+            pefile = make_shared<MemoryMapPEFile>(cdll_path);
 
         this->m_info_window = PEInfoWindow(canonicalizeModuleName(cdll_path), pefile);
         this->m_is_valid = true;
@@ -63,9 +65,7 @@ GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node, bool dbgplugin_
     if (!node.IsSequence() && node.IsDefined())
         throw std::runtime_error("GuiSplugDllInjector: node is not a sequence");
     
-    bool found_antianti = false;
-    bool found_monitor = false;
-
+    vector<bool> internal_list(internal_dlls.size(), false);
     for (size_t i=0;i<node.size();i++) {
         auto& item = node[i];
         if (!item.IsMap())
@@ -77,12 +77,12 @@ GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node, bool dbgplugin_
         string dll_path = item["path"].as<string>();
         string exchange = item["exchange"].as<string>("");
 
-        if (dll_path == ANTIANTI_DLL) {
+        auto internalpos = std::find_if(internal_dlls.begin(), internal_dlls.end(),
+                                        [&](const InternalDLLInfo& idll) 
+                                            { return dll_path == idll.m_dllname; });
+        if (internalpos != internal_dlls.end()) {
             state.is_internal = true;
-            found_antianti = true;
-        } else if (dll_path == MONITORING_DLL) {
-            state.is_internal = true;
-            found_monitor = true;
+            internal_list[std::distance(internal_dlls.begin(), internalpos)] = true;
         }
 
         if (dll_path.empty())
@@ -95,21 +95,16 @@ GuiSplugDllInjector::GuiSplugDllInjector(const YAML::Node& node, bool dbgplugin_
         this->m_dlls.push_back(state);
     }
 
-    if (!found_monitor) {
+    for (size_t i=internal_list.size();i>0;i--) {
+        if (internal_list[i-1])
+            continue;
+
+        auto& idll = internal_dlls[i-1];
+
         DLLInjectState state;
         state.is_internal = true;
-        strncpy(state.dll_path.get(), MONITORING_DLL, MAX_ADDR_LEN);
-        strncpy(state.exchange.get(), MONITORING_DLL_EXCHANGE_SYMBOL, MAX_ADDR_LEN);
-
-        state.refresh();
-        this->m_dlls.insert(this->m_dlls.begin(), state);
-    }
-
-    if (!found_antianti) {
-        DLLInjectState state;
-        state.is_internal = true;
-        strncpy(state.dll_path.get(), ANTIANTI_DLL, MAX_ADDR_LEN);
-        strncpy(state.exchange.get(), ANTIANTI_DLL_EXCHANGE_SYMBOL, MAX_ADDR_LEN);
+        strncpy(state.dll_path.get(), idll.m_dllname.c_str(), MAX_ADDR_LEN);
+        strncpy(state.exchange.get(), idll.m_exchange_symbol.c_str(), MAX_ADDR_LEN);
 
         state.refresh();
         this->m_dlls.insert(this->m_dlls.begin(), state);

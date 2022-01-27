@@ -1,5 +1,4 @@
 #include "scyllagui/splug/inline_hook.h"
-#include "scylla_constants.h"
 #include "str_utils.h"
 #include <stdexcept>
 #include <regex>

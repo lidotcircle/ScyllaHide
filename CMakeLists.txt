@@ -18,6 +18,7 @@ add_subdirectory("sutils")
 add_subdirectory("sexchange")
 add_subdirectory("slogger")
 add_subdirectory("smalloc")
+add_subdirectory("sinternaldlls")
 
 add_subdirectory("Scylla")
 add_subdirectory("HookLibrary")

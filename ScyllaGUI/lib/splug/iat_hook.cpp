@@ -1,5 +1,4 @@
 #include "scyllagui/splug/iat_hook.h"
-#include "scylla_constants.h"
 #include "str_utils.h"
 #include <stdexcept>
 #include <regex>

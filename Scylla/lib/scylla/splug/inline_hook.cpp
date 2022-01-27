@@ -1,6 +1,5 @@
 #include "process/map_pe_module.h"
 #include "scylla/splug/inline_hook.h"
-#include "scylla_constants.h"
 #include "utils.hpp"
 #include <iostream>
 #include <stdexcept>

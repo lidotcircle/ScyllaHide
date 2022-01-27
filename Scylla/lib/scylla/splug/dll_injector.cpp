@@ -1,20 +1,12 @@
 #include "scylla/splug/dll_injector.h"
-#include "hook_library.h"
-#include "monitor_library.h"
+#include "internal_dlls.h"
 #include "str_utils.h"
-#include "scylla_constants.h"
 #include <stdexcept>
 using namespace std;
 using namespace scylla;
 
 
 namespace scylla {
-
-const unsigned char* hook_library_data = hook_library;
-const size_t         hook_library_data_size = sizeof(hook_library);
-const unsigned char* monitor_library_data = monitor_library;
-const size_t         monitor_library_data_size = sizeof(monitor_library);
-
 
 InjectDLLInfo::~InjectDLLInfo() {}
 
@@ -51,13 +43,17 @@ void SPlugDLLInjector::doit(const YAML::Node& node) {
 
         logger->info("injecting dll: %s, stealthy = %s", path.c_str(), stealthy ? "true" : "false");
         try {
-            if (path == ANTIANTI_DLL) {
-                process->inject_dll(hook_library_data, hook_library_data_size, path, stealthy);
-            } else if (path == MONITORING_DLL) {
-                process->inject_dll(monitor_library_data, monitor_library_data_size, path, stealthy);
-            } else {
-                process->inject_dll(path, stealthy);
+            bool found_internal = false;
+            for (auto& idll : internal_dlls) {
+                if (path == idll.m_dllname) {
+                    process->inject_dll(idll.m_data, idll.m_size, path, stealthy);
+                    found_internal = true;
+                    break;
+                }
             }
+
+            if (!found_internal)
+                process->inject_dll(path, stealthy);
         } catch (exception& e) {
             logger->error("inject dll failed: %s", e.what());
             throw e;

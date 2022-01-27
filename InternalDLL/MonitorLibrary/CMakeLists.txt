@@ -31,8 +31,8 @@ add_custom_command(OUTPUT ${DLL_DATA_HEADER_FILE}
                         -DHEADER_FILENAME="${DLL_DATA_HEADER_FILE}"
                         -P ${CMAKE_CURRENT_LIST_DIR}/MonitorLibraryResource.cmake
                   DEPENDS MonitorLibrary)
-add_custom_target(generate_hooklib_header DEPENDS ${DLL_DATA_HEADER_FILE})
+add_custom_target(generate_monitorlib_header DEPENDS ${DLL_DATA_HEADER_FILE})
 
 add_library(MonitorLibraryResource INTERFACE)
 target_include_directories(MonitorLibraryResource INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
-add_dependencies(MonitorLibraryResource generate_hooklib_header)
+add_dependencies(MonitorLibraryResource generate_monitorlib_header)

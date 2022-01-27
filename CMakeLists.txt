@@ -21,12 +21,11 @@ add_subdirectory("smalloc")
 add_subdirectory("sinternaldlls")
 
 add_subdirectory("Scylla")
-add_subdirectory("HookLibrary")
-add_subdirectory("MonitorLibrary")
-add_subdirectory("InjectorCLI")
+add_subdirectory("InternalDLL")
+add_subdirectory("ScyllaCLI")
 
 add_subdirectory("ScyllaGUI")
-add_subdirectory("ScyllaStandalone")
+add_subdirectory("ScyllaMon")
 add_subdirectory("asplugin")
 
 add_subdirectory("ScyllaTest")

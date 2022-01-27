@@ -7,7 +7,8 @@
 #include <string>
 using namespace std;
 
-#define CACHE_SIZE 4096
+#define PREFERED_CACHE_SIZE 4096
+#define MIN_AB(a, b) ((a) < (b) ? (a) : (b))
 
 
 static string integer2hexstr(int64_t val) {
@@ -24,7 +25,7 @@ static string addr2hexstr(void* addr) {
 
 MemoryMapWinPage::MemoryMapWinPage(ProcessHandle handle, void* base, size_t size, bool direct_write):
     process_handle(handle), baseaddress(reinterpret_cast<addr_t>(base)), map_size(size),
-    cache(new char[CACHE_SIZE]), cache_size(0), cache_offset(size), direct_write(direct_write), write_dirty(false)
+    cache(new char[PREFERED_CACHE_SIZE]), cache_size(0), cache_offset(size), direct_write(direct_write), write_dirty(false)
 {
 }
 
@@ -84,20 +85,22 @@ char MemoryMapWinPage::get_at(addr_t offset) const {
     }
     DWORD alloc_protect = mbi.AllocationProtect, old_protect;
     bool readable = page_readable(mbi.Protect);
+    const size_t kcache_size = MIN_AB(PREFERED_CACHE_SIZE, map_size - offset);
 
-    if (!readable && !VirtualProtectEx(*this->process_handle.get(), addr, CACHE_SIZE, alloc_protect, &old_protect)) {
+    if (!readable && !VirtualProtectEx(*this->process_handle.get(), addr, kcache_size, alloc_protect, &old_protect)) {
         throw runtime_error("MemoryMapWinPage::get_at(): VirtualProtectEx failed: 0x" + addr2hexstr(addr));
     }
 
     auto cleanProtectEx = defer([&]() {
         if (!readable)
-            VirtualProtectEx(*this->process_handle.get(), addr, CACHE_SIZE, old_protect, &old_protect);
+            VirtualProtectEx(*this->process_handle.get(), addr, kcache_size, old_protect, &old_protect);
     });
 
-    SIZE_T n;
-    if (!ReadProcessMemory(*this->process_handle.get(), addr, cache, CACHE_SIZE, &n)) {
+    SIZE_T n = 0;
+    if (!ReadProcessMemory(*this->process_handle.get(), addr, cache, kcache_size, &n) || n != kcache_size) {
         throw runtime_error("MemoryMapWinPage::get_at(): ReadProcessMemory failed at: 0x" + addr2hexstr(addr) + 
-                            ", region base: 0x" + integer2hexstr(base));
+                            ", region base: 0x" + integer2hexstr(base) + " NumOfBytesRead = " + to_string(n) +
+                            ", " + GetLastErrorAsString());
     }
 
     _this->cache_size = n;
@@ -113,17 +116,15 @@ void MemoryMapWinPage::set_at(addr_t offset, char value) {
     auto addr = reinterpret_cast<void*>(this->baseaddress + offset);
     if (this->direct_write) {
         DWORD old_protect;
-        if (!VirtualProtectEx(*this->process_handle.get(), addr, CACHE_SIZE, PAGE_READWRITE, &old_protect))
+        if (!VirtualProtectEx(*this->process_handle.get(), addr, 1, PAGE_READWRITE, &old_protect))
         {
             throw runtime_error("MemoryMapWinPage::set_at(): VirtualProtectEx failed: 0x" + addr2hexstr(addr));
         }
+        auto d1 = defer([&]() { VirtualProtectEx(*this->process_handle.get(), addr, 1, old_protect, &old_protect); });
 
-        auto result = WriteProcessMemory(*this->process_handle.get(), addr, &value, 1, nullptr);
-        VirtualProtectEx(*this->process_handle.get(), addr, CACHE_SIZE, old_protect, &old_protect);
-        
-        if (!result) {
+        if (!WriteProcessMemory(*this->process_handle.get(), addr, &value, 1, nullptr))
             throw runtime_error("MemoryMapWinPage::set_at(): WriteProcessMemory failed");
-        }
+
         return;
     }
 
@@ -150,14 +151,14 @@ void MemoryMapWinPage::flush() {
     DWORD alloc_protect = mbi.AllocationProtect, old_protect;
     bool writable = page_writable(mbi.Protect);
 
-    if (!writable && !VirtualProtectEx(*this->process_handle.get(), addr, CACHE_SIZE, PAGE_EXECUTE_READWRITE, &old_protect))
+    if (!writable && !VirtualProtectEx(*this->process_handle.get(), addr, this->cache_size, PAGE_EXECUTE_READWRITE, &old_protect))
     {
         throw runtime_error("VirtualProtectEx failed");
     }
 
     auto clearProtectEx = defer([&]() {
         if (!writable)
-            VirtualProtectEx(*this->process_handle.get(), addr, CACHE_SIZE, old_protect, &old_protect);
+            VirtualProtectEx(*this->process_handle.get(), addr, this->cache_size, old_protect, &old_protect);
         this->cache_offset = this->map_size;
         this->write_dirty = false;
     });
